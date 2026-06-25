@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+cd "$(dirname "$0")"
+
+# Sync files to the server, excluding certain directories and files
+rsync -av \
+  --delete \
+  --exclude=.venv \
+  --exclude=__pycache__ \
+  --exclude=.git \
+  --exclude=.agents \
+  --exclude=.codex \
+  --exclude=.vscode \
+  --exclude=convert \
+  --exclude=rsynccopy \
+  ./ roland@192.168.178.124:/opt/ernaehrungstagebuch/
+
+# Update the config.ini file on the server to set quelle=prod
+ssh roland@192.168.178.124 \
+'python3 -c "from pathlib import Path; path = Path(\"/opt/ernaehrungstagebuch/config.ini\"); text = path.read_text(encoding=\"utf-8\"); lines = [\"quelle=prod\" if line.strip().startswith(\"quelle=\") else line for line in text.splitlines()]; path.write_text(\"\\n\".join(lines) + \"\\n\", encoding=\"utf-8\")"'
+
+# Increment the patch version in main.py
+perl -pi -e "s/(APP_VERSION = '.*?\.)(\d+)(')/\$1 . (\$2 + 1) . \$3/e" main.py
+
+ssh roland@192.168.178.124 'sudo -n systemctl restart ernaehrungstagebuch'
+
