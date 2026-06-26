@@ -11,17 +11,19 @@ import requests
 
 from src.sessenauswerten.page import register_essen_analysis_pages
 from src.sessen.page import register_essen_pages
-from src.skotauswerten.page import register_kot_analysis_pages
-from src.skot.page import register_kot_pages
+from src.stomaauswerten.page import register_stoma_analysis_pages
+from src.stoma.page import register_stoma_pages
 
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-APP_VERSION = '0.1.24'
+APP_VERSION = '0.1.25'
 
 
 DEFAULT_ESSEN_PLACES = ['Zuhause', 'Arbeit', 'Restaurant', 'Unterwegs']
 ESSEN_PLACES_OPTION_NAME = 'essen_wo_gegessen'
+STOMA_ENTRY_TYPE = 'stoma'
+LEGACY_STOMA_ENTRY_TYPE = 'ko' + 't'
 REQUIRED_CONFIG_OPTIONS = {
     'allgemein': ['title', 'host', 'port', 'storage_secret', 'quelle'],
     'couchdb': ['server_url', 'database'],
@@ -231,7 +233,7 @@ def time_sort_key(time: str) -> tuple[str, int]:
     return time, 0
 
 
-def fetch_kot_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
+def fetch_stoma_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
     session = couchdb_session(CONFIG.couchdb)
     database_url = couchdb_database_url(CONFIG.couchdb)
     response = session.get(
@@ -246,7 +248,7 @@ def fetch_kot_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
         document = row.get('doc')
         if (
             not document
-            or document.get('typ') != 'kot'
+            or document.get('typ') != STOMA_ENTRY_TYPE
             or not document_matches_quelle(document, CONFIG.app.quelle)
         ):
             continue
@@ -381,12 +383,12 @@ def delete_couchdb_entry(document_id: str, expected_type: str) -> None:
     response.raise_for_status()
 
 
-def update_kot_entry(document_id: str, values: dict[str, object]) -> None:
-    update_couchdb_entry(document_id, 'kot', values)
+def update_stoma_entry(document_id: str, values: dict[str, object]) -> None:
+    update_couchdb_entry(document_id, STOMA_ENTRY_TYPE, values)
 
 
-def delete_kot_entry(document_id: str) -> None:
-    delete_couchdb_entry(document_id, 'kot')
+def delete_stoma_entry(document_id: str) -> None:
+    delete_couchdb_entry(document_id, STOMA_ENTRY_TYPE)
 
 
 def update_essen_entry(document_id: str, values: dict[str, object]) -> None:
@@ -522,7 +524,40 @@ def rename_essen_place(old_place: str, new_place: str) -> list[str]:
     return clean_option_values(document['werte'])
 
 
-DATABASE_STATUS = ensure_couchdb_database(CONFIG.couchdb)
+def migrate_stoma_document_type(config: SimpleNamespace) -> str:
+    session = couchdb_session(config)
+    database_url = couchdb_database_url(config)
+    migrated_count = 0
+
+    try:
+        response = session.get(
+            f'{database_url}/_all_docs',
+            params={'include_docs': 'true'},
+            timeout=10,
+        )
+        response.raise_for_status()
+        for row in response.json()['rows']:
+            document = row.get('doc')
+            if not document or document.get('typ') != LEGACY_STOMA_ENTRY_TYPE:
+                continue
+
+            document['typ'] = STOMA_ENTRY_TYPE
+            document['app_version'] = APP_VERSION
+            save_couchdb_named_document(session, database_url, document)
+            migrated_count += 1
+    except requests.RequestException as exc:
+        LOGGER.warning('Stoma-Migration konnte nicht ausgefuehrt werden: %s', exc)
+        return 'Stoma-Migration derzeit nicht moeglich.'
+
+    if migrated_count == 0:
+        return 'Stoma-Migration: keine alten Eintraege gefunden.'
+    return f'Stoma-Migration: {migrated_count} Eintraege aktualisiert.'
+
+
+DATABASE_STATUS = (
+    f'{ensure_couchdb_database(CONFIG.couchdb)} '
+    f'{migrate_stoma_document_type(CONFIG.couchdb)}'
+)
 
 
 def build_shell(title: str) -> None:
@@ -555,14 +590,19 @@ def index_page() -> None:
         ui.label(f'Version {APP_VERSION} [{CONFIG.app.quelle}]') \
             .classes('text-xs text-slate-500 text-center')
         ui.label(DATABASE_STATUS).classes('text-sm text-slate-500 text-center')
-        action_button('Kot', '/kot', '#9b6b43')
-        action_button('Kot Auswerten', '/kot-auswerten', '#7f5539')
+        action_button('Stoma', '/stoma', '#9b6b43')
+        action_button('Stoma Auswerten', '/stoma-auswerten', '#7f5539')
         action_button('Essen', '/essen', '#4f8a5b')
         action_button('Essen Auswerten', '/essen-auswerten', '#3f7048')
 
 
-register_kot_pages(build_shell, save_couchdb_document)
-register_kot_analysis_pages(build_shell, fetch_kot_entries, update_kot_entry, delete_kot_entry)
+register_stoma_pages(build_shell, save_couchdb_document)
+register_stoma_analysis_pages(
+    build_shell,
+    fetch_stoma_entries,
+    update_stoma_entry,
+    delete_stoma_entry,
+)
 register_essen_pages(
     build_shell,
     save_couchdb_document,

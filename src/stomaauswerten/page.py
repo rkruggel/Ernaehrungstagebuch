@@ -5,10 +5,10 @@ from datetime import date, datetime
 
 from nicegui import ui
 
-FetchKotEntries = Callable[[str, str], list[dict[str, str]]]
-UpdateKotEntry = Callable[[str, dict[str, object]], None]
-DeleteKotEntry = Callable[[str], None]
-KOT_CONSISTENCIES = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig', 'Tumor']
+FetchStomaEntries = Callable[[str, str], list[dict[str, str]]]
+UpdateStomaEntry = Callable[[str, dict[str, object]], None]
+DeleteStomaEntry = Callable[[str], None]
+STOMA_CONSISTENCIES = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig', 'Tumor']
 
 
 def quarter_hour_time(value: object) -> str:
@@ -21,20 +21,20 @@ def quarter_hour_time(value: object) -> str:
     return parsed_time.replace(minute=minute).strftime('%H:%M')
 
 
-def register_kot_analysis_pages(
+def register_stoma_analysis_pages(
     build_shell: Callable[[str], None],
-    fetch_kot_entries: FetchKotEntries,
-    update_kot_entry: UpdateKotEntry,
-    delete_kot_entry: DeleteKotEntry,
+    fetch_stoma_entries: FetchStomaEntries,
+    update_stoma_entry: UpdateStomaEntry,
+    delete_stoma_entry: DeleteStomaEntry,
 ) -> None:
-    @ui.page('/kot-auswerten')
-    def kot_analysis_page() -> None:
-        build_shell('Kot Auswerten')
+    @ui.page('/stoma-auswerten')
+    def stoma_analysis_page() -> None:
+        build_shell('Stoma Auswerten')
 
         today = date.today().isoformat()
 
         with ui.column().classes('min-h-screen w-full items-center gap-5 px-6 py-10'):
-            ui.label('Kot Auswerten').classes('text-3xl font-bold text-slate-800 text-center')
+            ui.label('Stoma Auswerten').classes('text-3xl font-bold text-slate-800 text-center')
 
             with ui.row().classes('w-full max-w-2xl flex-wrap items-end justify-center gap-4'):
                 date_from_input = ui.input('Datum von', value=today).props('type=date') \
@@ -104,7 +104,7 @@ def register_kot_analysis_pages(
                     return
 
                 try:
-                    rows = fetch_kot_entries(date_from, date_to)
+                    rows = fetch_stoma_entries(date_from, date_to)
                 except Exception as exc:
                     status_label.set_text(f'Laden fehlgeschlagen: {exc}')
                     result_table.rows = []
@@ -116,13 +116,13 @@ def register_kot_analysis_pages(
                 status_label.set_text(f'{len(rows)} Eintraege gefunden.')
 
             with ui.dialog() as edit_dialog, ui.card().classes('w-[360px] max-w-full gap-3'):
-                ui.label('Kot ändern').classes('text-lg font-semibold text-slate-900')
+                ui.label('Stoma ändern').classes('text-lg font-semibold text-slate-900')
                 edit_id = {'value': ''}
                 edit_date_input = ui.input('Datum').props('type=date dense').classes('w-full')
                 edit_time_input = ui.input('Zeit').props('type=time step=900 dense') \
                     .classes('w-full')
                 edit_consistency_select = ui.select(
-                    KOT_CONSISTENCIES,
+                    STOMA_CONSISTENCIES,
                     label='Konsistenz',
                 ).props('dense options-dense').classes('w-full')
                 with ui.row().classes('w-full justify-end gap-2'):
@@ -157,7 +157,7 @@ def register_kot_analysis_pages(
                     ui.notify('Bitte alle Felder ausfuellen.', color='warning')
                     return
                 try:
-                    update_kot_entry(row_id, document)
+                    update_stoma_entry(row_id, document)
                 except Exception as exc:
                     ui.notify(f'Aendern fehlgeschlagen: {exc}', color='negative')
                     return
@@ -174,7 +174,7 @@ def register_kot_analysis_pages(
 
             def confirm_delete() -> None:
                 try:
-                    delete_kot_entry(delete_id['value'])
+                    delete_stoma_entry(delete_id['value'])
                 except Exception as exc:
                     ui.notify(f'Loeschen fehlgeschlagen: {exc}', color='negative')
                     return

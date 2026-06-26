@@ -8,7 +8,7 @@ from nicegui import app, ui
 SaveDocument = Callable[[dict[str, object]], str]
 
 CONSISTENCY_OPTIONS = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig', 'Tumor']
-LAST_CONSISTENCY_STORAGE_KEY = 'kot_last_consistency'
+LAST_CONSISTENCY_STORAGE_KEY = 'stoma_last_consistency'
 
 
 def prioritize_option(options: list[str], selected_value: object) -> list[str]:
@@ -29,13 +29,13 @@ def remembered_consistency() -> str:
     return selected if selected in CONSISTENCY_OPTIONS else 'hart'
 
 
-def register_kot_pages(build_shell: Callable[[str], None], save_document: SaveDocument) -> None:
-    @ui.page('/kot')
-    def kot_page() -> None:
-        build_shell('Kot')
+def register_stoma_pages(build_shell: Callable[[str], None], save_document: SaveDocument) -> None:
+    @ui.page('/stoma')
+    def stoma_page() -> None:
+        build_shell('Stoma')
 
         with ui.column().classes('min-h-screen w-full items-center justify-center gap-5 px-6'):
-            ui.label('Kot').classes('text-3xl font-bold text-slate-800 text-center')
+            ui.label('Stoma').classes('text-3xl font-bold text-slate-800 text-center')
             initial_consistency = remembered_consistency()
             consistency_select = ui.select(
                 prioritize_option(CONSISTENCY_OPTIONS, initial_consistency),
@@ -54,7 +54,7 @@ def register_kot_pages(build_shell: Callable[[str], None], save_document: SaveDo
             def save_entry() -> None:
                 timestamp = current_quarter_hour()
                 document = {
-                    'typ': 'kot',
+                    'typ': 'stoma',
                     'konsistenz': consistency_select.value,
                     'datum': timestamp.strftime('%Y-%m-%d'),
                     'zeit': timestamp.strftime('%H:%M'),
