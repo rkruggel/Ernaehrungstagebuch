@@ -14,10 +14,10 @@ from src.sessen.page import register_essen_pages
 from src.stomaauswerten.page import register_stoma_analysis_pages
 from src.stoma.page import register_stoma_pages
 
-
+#test
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-APP_VERSION = '0.1.25'
+APP_VERSION = '0.1.26'
 
 
 DEFAULT_ESSEN_PLACES = ['Zuhause', 'Arbeit', 'Restaurant', 'Unterwegs']
