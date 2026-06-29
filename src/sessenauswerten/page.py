@@ -42,10 +42,6 @@ def register_essen_analysis_pages(
                 date_to_input = ui.input('Datum bis', value=today).props('type=date') \
                     .classes('w-32 max-w-full')
                 source_switch = ui.switch(value=False).props('dense')
-                with ui.button(icon='check', on_click=lambda: load_entries()).props(
-                    'round unelevated color=positive aria-label="OK"'
-                ).classes('h-12 w-12'):
-                    ui.tooltip('Suchen')
 
             date_columns = [
                 {'name': 'datum', 'label': 'Datum', 'field': 'datum', 'align': 'left'},
@@ -211,5 +207,6 @@ def register_essen_analysis_pages(
             source_switch.on_value_change(update_columns)
             date_from_input.on_value_change(load_entries)
             date_to_input.on_value_change(load_entries)
+            load_entries()
             ui.button('Zurueck', on_click=lambda: ui.navigate.to('/')).props('outline') \
                 .classes('rounded-2xl px-6 py-3 text-base font-medium')
