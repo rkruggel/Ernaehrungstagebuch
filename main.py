@@ -13,6 +13,8 @@ from src.sessenauswerten.page import register_essen_analysis_pages
 from src.sessen.page import register_essen_pages
 from src.sstomaauswerten.page import register_stoma_analysis_pages
 from src.sstoma.page import register_stoma_pages
+from src.stumorauswerten.page import register_tumor_analysis_pages
+from src.stumor.page import register_tumor_pages
 
 
 logging.basicConfig(level=logging.INFO)
@@ -669,6 +671,10 @@ register_stoma_analysis_pages(
     fetch_stoma_entries,
     update_stoma_entry,
     delete_stoma_entry,
+)
+register_tumor_pages(build_shell, save_couchdb_document)
+register_tumor_analysis_pages(
+    build_shell,
     fetch_tumor_entries,
     update_tumor_entry,
     delete_tumor_entry,

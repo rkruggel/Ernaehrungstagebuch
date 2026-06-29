@@ -5,10 +5,13 @@ from datetime import date, datetime
 
 from nicegui import ui
 
-FetchStomaEntries = Callable[[str, str], list[dict[str, str]]]
-UpdateStomaEntry = Callable[[str, dict[str, object]], None]
-DeleteStomaEntry = Callable[[str], None]
-STOMA_CONSISTENCIES = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig']
+FetchTumorEntries = Callable[[str, str], list[dict[str, str]]]
+UpdateTumorEntry = Callable[[str, dict[str, object]], None]
+DeleteTumorEntry = Callable[[str], None]
+AMOUNT_OPTIONS = ['wenig', 'mittel', 'viel']
+COLOR_OPTIONS = ['klar', 'rosa', 'rot']
+DEFAULT_AMOUNT = 'mittel'
+DEFAULT_COLOR = 'klar'
 
 
 def quarter_hour_time(value: object) -> str:
@@ -21,19 +24,20 @@ def quarter_hour_time(value: object) -> str:
     return parsed_time.replace(minute=minute).strftime('%H:%M')
 
 
-def register_stoma_analysis_pages(
+def register_tumor_analysis_pages(
     build_shell: Callable[[str], None],
-    fetch_stoma_entries: FetchStomaEntries,
-    update_stoma_entry: UpdateStomaEntry,
-    delete_stoma_entry: DeleteStomaEntry,
+    fetch_tumor_entries: FetchTumorEntries,
+    update_tumor_entry: UpdateTumorEntry,
+    delete_tumor_entry: DeleteTumorEntry,
 ) -> None:
-    @ui.page('/stoma-auswerten')
-    def stoma_analysis_page() -> None:
-        build_shell('Stoma Auswerten')
+    @ui.page('/tumor-auswerten')
+    def tumor_analysis_page() -> None:
+        build_shell('Tumor Auswerten')
+
         today = date.today().isoformat()
 
         with ui.column().classes('min-h-screen w-full items-center gap-5 px-6 py-10'):
-            ui.label('Stoma Auswerten').classes('text-3xl font-bold text-slate-800 text-center')
+            ui.label('Tumor Auswerten').classes('text-3xl font-bold text-slate-800 text-center')
 
             with ui.row().classes('w-full max-w-2xl flex-wrap items-end justify-center gap-4'):
                 date_from_input = ui.input('Datum von', value=today).props('type=date') \
@@ -51,18 +55,10 @@ def register_stoma_analysis_pages(
                 {'name': 'zeit', 'label': 'Zeit', 'field': 'zeit', 'align': 'left'},
             ]
             source_column = {'name': 'quelle', 'label': 'Quelle', 'field': 'quelle', 'align': 'left'}
-            consistency_column = {
-                'name': 'konsistenz',
-                'label': 'Konsistenz',
-                'field': 'konsistenz',
-                'align': 'left',
-            }
-            plate_column = {
-                'name': 'platte',
-                'label': 'Platte',
-                'field': 'platte',
-                'align': 'left',
-            }
+            data_columns = [
+                {'name': 'farbe', 'label': 'Farbe', 'field': 'farbe', 'align': 'left'},
+                {'name': 'menge', 'label': 'Menge', 'field': 'menge', 'align': 'left'},
+            ]
             action_column = {'name': 'aktionen', 'label': '', 'field': 'aktionen', 'align': 'right'}
             result_table = ui.table(columns=[], rows=[], row_key='row_key') \
                 .classes('w-full max-w-2xl')
@@ -85,7 +81,7 @@ def register_stoma_analysis_pages(
                 columns = [*date_columns]
                 if source_switch.value:
                     columns.append(source_column)
-                return [*columns, consistency_column, plate_column, action_column]
+                return [*columns, *data_columns, action_column]
 
             def update_columns() -> None:
                 result_table.columns = visible_columns()
@@ -107,7 +103,7 @@ def register_stoma_analysis_pages(
                     return
 
                 try:
-                    rows = fetch_stoma_entries(date_from, date_to)
+                    rows = fetch_tumor_entries(date_from, date_to)
                 except Exception as exc:
                     status_label.set_text(f'Laden fehlgeschlagen: {exc}')
                     result_table.rows = []
@@ -119,16 +115,21 @@ def register_stoma_analysis_pages(
                 status_label.set_text(f'{len(rows)} Eintraege gefunden.')
 
             with ui.dialog() as edit_dialog, ui.card().classes('w-[360px] max-w-full gap-3'):
-                ui.label('Stoma ändern').classes('text-lg font-semibold text-slate-900')
+                ui.label('Tumor ändern').classes('text-lg font-semibold text-slate-900')
                 edit_id = {'value': ''}
                 edit_date_input = ui.input('Datum').props('type=date dense').classes('w-full')
                 edit_time_input = ui.input('Zeit').props('type=time step=900 dense') \
                     .classes('w-full')
-                edit_consistency_select = ui.select(
-                    STOMA_CONSISTENCIES,
-                    label='Konsistenz',
+                edit_color_select = ui.select(
+                    COLOR_OPTIONS,
+                    label='Farbe',
+                    value=DEFAULT_COLOR,
                 ).props('dense options-dense').classes('w-full')
-                edit_plate_switch = ui.switch('Platte', value=False).props('dense')
+                edit_amount_select = ui.select(
+                    AMOUNT_OPTIONS,
+                    label='Menge',
+                    value=DEFAULT_AMOUNT,
+                ).props('dense options-dense').classes('w-full')
                 with ui.row().classes('w-full justify-end gap-2'):
                     ui.button('Abbrechen', on_click=edit_dialog.close).props('flat no-caps dense')
                     ui.button('Speichern', on_click=lambda: save_edit()).props('no-caps dense')
@@ -147,8 +148,8 @@ def register_stoma_analysis_pages(
                 edit_id['value'] = str(row.get('row_key', ''))
                 edit_date_input.value = row.get('datum', '')
                 edit_time_input.value = quarter_hour_time(row.get('zeit', ''))
-                edit_consistency_select.value = row.get('konsistenz', '')
-                edit_plate_switch.value = row.get('platte') == 'ja'
+                edit_color_select.value = row.get('farbe') or DEFAULT_COLOR
+                edit_amount_select.value = row.get('menge') or DEFAULT_AMOUNT
                 edit_dialog.open()
 
             def save_edit() -> None:
@@ -156,14 +157,14 @@ def register_stoma_analysis_pages(
                 document = {
                     'datum': str(edit_date_input.value or ''),
                     'zeit': quarter_hour_time(edit_time_input.value),
-                    'konsistenz': str(edit_consistency_select.value or ''),
-                    'platte': bool(edit_plate_switch.value),
+                    'farbe': str(edit_color_select.value or DEFAULT_COLOR),
+                    'menge': str(edit_amount_select.value or DEFAULT_AMOUNT),
                 }
-                if not document['datum'] or not document['zeit'] or not document['konsistenz']:
+                if not document['datum'] or not document['zeit'] or not document['farbe']:
                     ui.notify('Bitte alle Felder ausfuellen.', color='warning')
                     return
                 try:
-                    update_stoma_entry(row_id, document)
+                    update_tumor_entry(row_id, document)
                 except Exception as exc:
                     ui.notify(f'Aendern fehlgeschlagen: {exc}', color='negative')
                     return
@@ -173,16 +174,15 @@ def register_stoma_analysis_pages(
 
             def open_delete(row: dict[str, str]) -> None:
                 delete_id['value'] = str(row.get('row_key', ''))
-                plate_text = ' Platte' if row.get('platte') == 'ja' else ''
                 delete_label.set_text(
                     f"{row.get('datum', '')} {row.get('zeit', '')} "
-                    f"{row.get('konsistenz', '')}{plate_text}"
+                    f"{row.get('farbe', '')} {row.get('menge', '')}"
                 )
                 delete_dialog.open()
 
             def confirm_delete() -> None:
                 try:
-                    delete_stoma_entry(delete_id['value'])
+                    delete_tumor_entry(delete_id['value'])
                 except Exception as exc:
                     ui.notify(f'Loeschen fehlgeschlagen: {exc}', color='negative')
                     return
