@@ -1,3 +1,19 @@
+"""
+Projekt:
+	Ernährungstagebuch und Stoma-/Tumor-Dokumentation für Patienten.
+
+Modul:
+  main.py
+
+Beschreibung:
+	Startpunkt und Konfiguration der Ernährungstagebuch- und Stoma-/Tumor-Dokumentationsanwendung.
+
+Autor: Roland Kruggel
+Version: 0.1.37
+Start: 16.06.2026
+Lizens: MIT
+"""
+
 from __future__ import annotations
 
 import logging
