@@ -11,8 +11,8 @@ import requests
 
 from src.sessenauswerten.page import register_essen_analysis_pages
 from src.sessen.page import register_essen_pages
-from src.stomaauswerten.page import register_stoma_analysis_pages
-from src.stoma.page import register_stoma_pages
+from src.sstomaauswerten.page import register_stoma_analysis_pages
+from src.sstoma.page import register_stoma_pages
 
 
 logging.basicConfig(level=logging.INFO)
