@@ -10,8 +10,9 @@ SaveDocument = Callable[[dict[str, object]], str]
 CONSISTENCY_OPTIONS = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig']
 AMOUNT_OPTIONS = ['wenig', 'mittel', 'viel']
 LAST_CONSISTENCY_STORAGE_KEY = 'stoma_last_consistency'
-TUMOR_CONSISTENCY = 'Tumor'
 DEFAULT_AMOUNT = 'mittel'
+STOMA_ENTRY_TYPE = 'stoma'
+TUMOR_ENTRY_TYPE = 'tumor'
 
 
 def prioritize_option(options: list[str], selected_value: object) -> list[str]:
@@ -39,6 +40,8 @@ def register_stoma_pages(build_shell: Callable[[str], None], save_document: Save
         show_consistency_select: bool = True,
         show_amount_select: bool = False,
         show_plate_switch: bool = True,
+        document_type: str = STOMA_ENTRY_TYPE,
+        button_color: str = '#B77945',
     ) -> None:
         build_shell(title)
 
@@ -82,11 +85,12 @@ def register_stoma_pages(build_shell: Callable[[str], None], save_document: Save
             def save_entry() -> None:
                 timestamp = current_quarter_hour()
                 document = {
-                    'typ': 'stoma',
-                    'konsistenz': consistency_value['value'],
+                    'typ': document_type,
                     'datum': timestamp.strftime('%Y-%m-%d'),
                     'zeit': timestamp.strftime('%H:%M'),
                 }
+                if show_consistency_select:
+                    document['konsistenz'] = consistency_value['value']
                 if plate_switch is not None:
                     document['platte'] = bool(plate_switch.value)
                 if amount_select is not None:
@@ -106,7 +110,7 @@ def register_stoma_pages(build_shell: Callable[[str], None], save_document: Save
                 .classes(
                     'w-64 max-w-full rounded-2xl px-8 py-4 text-lg font-semibold text-white shadow-lg'
                 ) \
-                .style('background-color: #9b6b43;')
+                .style(f'background: {button_color} !important; color: white !important;')
             timestamp_label = ui.label('').classes(
                 'text-base font-medium text-slate-700 text-center'
             )
@@ -121,8 +125,9 @@ def register_stoma_pages(build_shell: Callable[[str], None], save_document: Save
     def tumor_page() -> None:
         render_stoma_page(
             'Tumor',
-            TUMOR_CONSISTENCY,
             show_consistency_select=False,
             show_amount_select=True,
             show_plate_switch=False,
+            document_type=TUMOR_ENTRY_TYPE,
+            button_color='#B84A5A',
         )

@@ -17,12 +17,13 @@ from src.stoma.page import register_stoma_pages
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-APP_VERSION = '0.1.29'
+APP_VERSION = '0.1.32'
 
 
 DEFAULT_ESSEN_PLACES = ['Zuhause', 'Arbeit', 'Restaurant', 'Unterwegs']
 ESSEN_PLACES_OPTION_NAME = 'essen_wo_gegessen'
 STOMA_ENTRY_TYPE = 'stoma'
+TUMOR_ENTRY_TYPE = 'tumor'
 LEGACY_STOMA_ENTRY_TYPE = 'ko' + 't'
 REQUIRED_CONFIG_OPTIONS = {
     'allgemein': ['title', 'host', 'port', 'storage_secret', 'quelle'],
@@ -233,7 +234,11 @@ def time_sort_key(time: str) -> tuple[str, int]:
     return time, 0
 
 
-def fetch_stoma_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
+def fetch_entries_by_type(
+    date_from: str,
+    date_to: str,
+    entry_type: str,
+) -> list[dict[str, str]]:
     session = couchdb_session(CONFIG.couchdb)
     database_url = couchdb_database_url(CONFIG.couchdb)
     response = session.get(
@@ -248,7 +253,7 @@ def fetch_stoma_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
         document = row.get('doc')
         if (
             not document
-            or document.get('typ') != STOMA_ENTRY_TYPE
+            or document.get('typ') != entry_type
             or not document_matches_quelle(document, CONFIG.app.quelle)
         ):
             continue
@@ -268,6 +273,18 @@ def fetch_stoma_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
             )
 
     return sorted(entries, key=lambda entry: (entry['datum'], time_sort_key(entry['zeit'])))
+
+
+def fetch_stoma_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
+    return [
+        entry
+        for entry in fetch_entries_by_type(date_from, date_to, STOMA_ENTRY_TYPE)
+        if str(entry.get('konsistenz') or '').strip().lower() != 'tumor'
+    ]
+
+
+def fetch_tumor_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
+    return fetch_entries_by_type(date_from, date_to, TUMOR_ENTRY_TYPE)
 
 
 def fetch_essen_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
@@ -391,6 +408,14 @@ def update_stoma_entry(document_id: str, values: dict[str, object]) -> None:
 
 def delete_stoma_entry(document_id: str) -> None:
     delete_couchdb_entry(document_id, STOMA_ENTRY_TYPE)
+
+
+def update_tumor_entry(document_id: str, values: dict[str, object]) -> None:
+    update_couchdb_entry(document_id, TUMOR_ENTRY_TYPE, values)
+
+
+def delete_tumor_entry(document_id: str) -> None:
+    delete_couchdb_entry(document_id, TUMOR_ENTRY_TYPE)
 
 
 def update_essen_entry(document_id: str, values: dict[str, object]) -> None:
@@ -556,9 +581,45 @@ def migrate_stoma_document_type(config: SimpleNamespace) -> str:
     return f'Stoma-Migration: {migrated_count} Eintraege aktualisiert.'
 
 
+def migrate_tumor_document_type(config: SimpleNamespace) -> str:
+    session = couchdb_session(config)
+    database_url = couchdb_database_url(config)
+    migrated_count = 0
+
+    try:
+        response = session.get(
+            f'{database_url}/_all_docs',
+            params={'include_docs': 'true'},
+            timeout=10,
+        )
+        response.raise_for_status()
+        for row in response.json()['rows']:
+            document = row.get('doc')
+            if (
+                not document
+                or document.get('typ') != STOMA_ENTRY_TYPE
+                or str(document.get('konsistenz') or '').strip().lower() != 'tumor'
+            ):
+                continue
+
+            document['typ'] = TUMOR_ENTRY_TYPE
+            document.pop('konsistenz', None)
+            document['app_version'] = APP_VERSION
+            save_couchdb_named_document(session, database_url, document)
+            migrated_count += 1
+    except requests.RequestException as exc:
+        LOGGER.warning('Tumor-Migration konnte nicht ausgefuehrt werden: %s', exc)
+        return 'Tumor-Migration derzeit nicht moeglich.'
+
+    if migrated_count == 0:
+        return 'Tumor-Migration: keine alten Eintraege gefunden.'
+    return f'Tumor-Migration: {migrated_count} Eintraege aktualisiert.'
+
+
 DATABASE_STATUS = (
     f'{ensure_couchdb_database(CONFIG.couchdb)} '
-    f'{migrate_stoma_document_type(CONFIG.couchdb)}'
+    f'{migrate_stoma_document_type(CONFIG.couchdb)} '
+    f'{migrate_tumor_document_type(CONFIG.couchdb)}'
 )
 
 
@@ -579,7 +640,7 @@ def action_button(label: str, target: str, color: str) -> None:
     ui.button(label, on_click=lambda: ui.navigate.to(target)).props('unelevated') \
         .classes(
             'w-full rounded-2xl px-4 py-5 text-lg font-semibold text-white shadow-lg'
-        ).style(f'background-color: {color}; min-height: 88px;')
+        ).style(f'background: {color} !important; color: white !important; min-height: 88px;')
 
 
 @ui.page('/')
@@ -593,12 +654,12 @@ def index_page() -> None:
             .classes('text-xs text-slate-500 text-center')
         ui.label(DATABASE_STATUS).classes('text-sm text-slate-500 text-center')
         with ui.grid(columns=2).classes('w-full max-w-xl gap-4'):
-            action_button('Tumor', '/tumor', '#b45353')
-            action_button('Tumor Auswerten', '/tumor-auswerten', '#8f3f46')
-            action_button('Stoma', '/stoma', '#9b6b43')
-            action_button('Stoma Auswerten', '/stoma-auswerten', '#7f5539')
-            action_button('Essen', '/essen', '#4f8a5b')
-            action_button('Essen Auswerten', '/essen-auswerten', '#3f7048')
+            action_button('Tumor', '/tumor', '#B84A5A')
+            action_button('Tumor Auswerten', '/tumor-auswerten', '#7E3A54')
+            action_button('Stoma', '/stoma', '#B77945')
+            action_button('Stoma Auswerten', '/stoma-auswerten', '#6F5A3C')
+            action_button('Essen', '/essen', '#4F8F6B')
+            action_button('Essen Auswerten', '/essen-auswerten', '#2F6F73')
 
 
 register_stoma_pages(build_shell, save_couchdb_document)
@@ -607,6 +668,9 @@ register_stoma_analysis_pages(
     fetch_stoma_entries,
     update_stoma_entry,
     delete_stoma_entry,
+    fetch_tumor_entries,
+    update_tumor_entry,
+    delete_tumor_entry,
 )
 register_essen_pages(
     build_shell,

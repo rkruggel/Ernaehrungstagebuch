@@ -298,7 +298,7 @@ def register_essen_pages(
                 .classes(
                     'w-64 max-w-full rounded-2xl px-8 py-4 text-lg font-semibold text-white shadow-lg'
                 ) \
-                .style('background-color: #4f8a5b;')
+                .style('background: #4F8F6B !important; color: white !important;')
             timestamp_label = ui.label('').classes(
                 'text-base font-medium text-slate-700 text-center'
             )

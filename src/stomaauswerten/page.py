@@ -8,7 +8,7 @@ from nicegui import ui
 FetchStomaEntries = Callable[[str, str], list[dict[str, str]]]
 UpdateStomaEntry = Callable[[str, dict[str, object]], None]
 DeleteStomaEntry = Callable[[str], None]
-STOMA_CONSISTENCIES = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig', 'Tumor']
+STOMA_CONSISTENCIES = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig']
 AMOUNT_OPTIONS = ['wenig', 'mittel', 'viel']
 DEFAULT_AMOUNT = 'mittel'
 
@@ -28,13 +28,21 @@ def register_stoma_analysis_pages(
     fetch_stoma_entries: FetchStomaEntries,
     update_stoma_entry: UpdateStomaEntry,
     delete_stoma_entry: DeleteStomaEntry,
+    fetch_tumor_entries: FetchStomaEntries,
+    update_tumor_entry: UpdateStomaEntry,
+    delete_tumor_entry: DeleteStomaEntry,
 ) -> None:
-    def render_stoma_analysis_page(title: str, consistency_filter: str | None = None) -> None:
+    def render_stoma_analysis_page(
+        title: str,
+        fetch_entries: FetchStomaEntries,
+        update_entry: UpdateStomaEntry,
+        delete_entry: DeleteStomaEntry,
+        show_consistency_field: bool = True,
+    ) -> None:
         build_shell(title)
 
         today = date.today().isoformat()
-        show_consistency_field = consistency_filter != 'Tumor'
-        edit_title = 'Tumor ändern' if consistency_filter == 'Tumor' else 'Stoma ändern'
+        edit_title = 'Stoma ändern' if show_consistency_field else 'Tumor ändern'
 
         with ui.column().classes('min-h-screen w-full items-center gap-5 px-6 py-10'):
             ui.label(title).classes('text-3xl font-bold text-slate-800 text-center')
@@ -97,7 +105,7 @@ def register_stoma_analysis_pages(
                 columns = [*date_columns]
                 if source_switch.value:
                     columns.append(source_column)
-                if consistency_filter != 'Tumor':
+                if show_consistency_field:
                     columns.append(consistency_column)
                 return [*columns, *data_columns, action_column]
 
@@ -121,18 +129,12 @@ def register_stoma_analysis_pages(
                     return
 
                 try:
-                    rows = fetch_stoma_entries(date_from, date_to)
+                    rows = fetch_entries(date_from, date_to)
                 except Exception as exc:
                     status_label.set_text(f'Laden fehlgeschlagen: {exc}')
                     result_table.rows = []
                     result_table.update()
                     return
-                if consistency_filter:
-                    rows = [
-                        row
-                        for row in rows
-                        if row.get('konsistenz') == consistency_filter
-                    ]
 
                 result_table.rows = rows
                 result_table.update()
@@ -185,19 +187,22 @@ def register_stoma_analysis_pages(
                 document = {
                     'datum': str(edit_date_input.value or ''),
                     'zeit': quarter_hour_time(edit_time_input.value),
-                    'konsistenz': (
-                        consistency_filter
-                        if consistency_filter
-                        else str(edit_consistency_select.value if edit_consistency_select else '')
-                    ),
                     'menge': str(edit_amount_select.value or DEFAULT_AMOUNT),
                     'platte': bool(edit_plate_switch.value),
                 }
-                if not document['datum'] or not document['zeit'] or not document['konsistenz']:
+                if show_consistency_field:
+                    document['konsistenz'] = str(
+                        edit_consistency_select.value if edit_consistency_select else ''
+                    )
+                if (
+                    not document['datum']
+                    or not document['zeit']
+                    or (show_consistency_field and not document['konsistenz'])
+                ):
                     ui.notify('Bitte alle Felder ausfuellen.', color='warning')
                     return
                 try:
-                    update_stoma_entry(row_id, document)
+                    update_entry(row_id, document)
                 except Exception as exc:
                     ui.notify(f'Aendern fehlgeschlagen: {exc}', color='negative')
                     return
@@ -209,15 +214,20 @@ def register_stoma_analysis_pages(
                 delete_id['value'] = str(row.get('row_key', ''))
                 amount_text = f" {row.get('menge', '')}" if row.get('menge') else ''
                 plate_text = ' Platte' if row.get('platte') == 'ja' else ''
+                consistency_text = (
+                    f"{row.get('konsistenz', '')}"
+                    if show_consistency_field
+                    else title.replace(' Auswerten', '')
+                )
                 delete_label.set_text(
                     f"{row.get('datum', '')} {row.get('zeit', '')} "
-                    f"{row.get('konsistenz', '')}{amount_text}{plate_text}"
+                    f"{consistency_text}{amount_text}{plate_text}"
                 )
                 delete_dialog.open()
 
             def confirm_delete() -> None:
                 try:
-                    delete_stoma_entry(delete_id['value'])
+                    delete_entry(delete_id['value'])
                 except Exception as exc:
                     ui.notify(f'Loeschen fehlgeschlagen: {exc}', color='negative')
                     return
@@ -241,8 +251,19 @@ def register_stoma_analysis_pages(
 
     @ui.page('/stoma-auswerten')
     def stoma_analysis_page() -> None:
-        render_stoma_analysis_page('Stoma Auswerten')
+        render_stoma_analysis_page(
+            'Stoma Auswerten',
+            fetch_stoma_entries,
+            update_stoma_entry,
+            delete_stoma_entry,
+        )
 
     @ui.page('/tumor-auswerten')
     def tumor_analysis_page() -> None:
-        render_stoma_analysis_page('Tumor Auswerten', 'Tumor')
+        render_stoma_analysis_page(
+            'Tumor Auswerten',
+            fetch_tumor_entries,
+            update_tumor_entry,
+            delete_tumor_entry,
+            show_consistency_field=False,
+        )
