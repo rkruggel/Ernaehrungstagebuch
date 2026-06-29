@@ -14,10 +14,10 @@ from src.sessen.page import register_essen_pages
 from src.stomaauswerten.page import register_stoma_analysis_pages
 from src.stoma.page import register_stoma_pages
 
-#test
+
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-APP_VERSION = '0.1.26'
+APP_VERSION = '0.1.28'
 
 
 DEFAULT_ESSEN_PLACES = ['Zuhause', 'Arbeit', 'Restaurant', 'Unterwegs']
@@ -261,6 +261,8 @@ def fetch_stoma_entries(date_from: str, date_to: str) -> list[dict[str, str]]:
                     'datum': entry_date,
                     'zeit': str(document.get('zeit', '')),
                     'konsistenz': str(document.get('konsistenz', '')),
+                    'menge': str(document.get('menge', '')),
+                    'platte': 'ja' if document.get('platte') else 'nein',
                     'quelle': document_quelle(document),
                 }
             )
@@ -592,6 +594,8 @@ def index_page() -> None:
         ui.label(DATABASE_STATUS).classes('text-sm text-slate-500 text-center')
         action_button('Stoma', '/stoma', '#9b6b43')
         action_button('Stoma Auswerten', '/stoma-auswerten', '#7f5539')
+        action_button('Tumor', '/tumor', '#b45353')
+        action_button('Tumor Auswerten', '/tumor-auswerten', '#8f3f46')
         action_button('Essen', '/essen', '#4f8a5b')
         action_button('Essen Auswerten', '/essen-auswerten', '#3f7048')
 

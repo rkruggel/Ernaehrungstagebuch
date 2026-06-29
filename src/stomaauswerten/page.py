@@ -9,6 +9,8 @@ FetchStomaEntries = Callable[[str, str], list[dict[str, str]]]
 UpdateStomaEntry = Callable[[str, dict[str, object]], None]
 DeleteStomaEntry = Callable[[str], None]
 STOMA_CONSISTENCIES = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig', 'Tumor']
+AMOUNT_OPTIONS = ['wenig', 'mittel', 'viel']
+DEFAULT_AMOUNT = 'mittel'
 
 
 def quarter_hour_time(value: object) -> str:
@@ -27,14 +29,13 @@ def register_stoma_analysis_pages(
     update_stoma_entry: UpdateStomaEntry,
     delete_stoma_entry: DeleteStomaEntry,
 ) -> None:
-    @ui.page('/stoma-auswerten')
-    def stoma_analysis_page() -> None:
-        build_shell('Stoma Auswerten')
+    def render_stoma_analysis_page(title: str, consistency_filter: str | None = None) -> None:
+        build_shell(title)
 
         today = date.today().isoformat()
 
         with ui.column().classes('min-h-screen w-full items-center gap-5 px-6 py-10'):
-            ui.label('Stoma Auswerten').classes('text-3xl font-bold text-slate-800 text-center')
+            ui.label(title).classes('text-3xl font-bold text-slate-800 text-center')
 
             with ui.row().classes('w-full max-w-2xl flex-wrap items-end justify-center gap-4'):
                 date_from_input = ui.input('Datum von', value=today).props('type=date') \
@@ -57,6 +58,18 @@ def register_stoma_analysis_pages(
                     'name': 'konsistenz',
                     'label': 'Konsistenz',
                     'field': 'konsistenz',
+                    'align': 'left',
+                },
+                {
+                    'name': 'menge',
+                    'label': 'Menge',
+                    'field': 'menge',
+                    'align': 'left',
+                },
+                {
+                    'name': 'platte',
+                    'label': 'Platte',
+                    'field': 'platte',
                     'align': 'left',
                 },
             ]
@@ -110,6 +123,12 @@ def register_stoma_analysis_pages(
                     result_table.rows = []
                     result_table.update()
                     return
+                if consistency_filter:
+                    rows = [
+                        row
+                        for row in rows
+                        if row.get('konsistenz') == consistency_filter
+                    ]
 
                 result_table.rows = rows
                 result_table.update()
@@ -125,6 +144,12 @@ def register_stoma_analysis_pages(
                     STOMA_CONSISTENCIES,
                     label='Konsistenz',
                 ).props('dense options-dense').classes('w-full')
+                edit_amount_select = ui.select(
+                    AMOUNT_OPTIONS,
+                    label='Menge',
+                    value=DEFAULT_AMOUNT,
+                ).props('dense options-dense').classes('w-full')
+                edit_plate_switch = ui.switch('Platte', value=False).props('dense')
                 with ui.row().classes('w-full justify-end gap-2'):
                     ui.button('Abbrechen', on_click=edit_dialog.close).props('flat no-caps dense')
                     ui.button('Speichern', on_click=lambda: save_edit()).props('no-caps dense')
@@ -144,6 +169,8 @@ def register_stoma_analysis_pages(
                 edit_date_input.value = row.get('datum', '')
                 edit_time_input.value = quarter_hour_time(row.get('zeit', ''))
                 edit_consistency_select.value = row.get('konsistenz', '')
+                edit_amount_select.value = row.get('menge') or DEFAULT_AMOUNT
+                edit_plate_switch.value = row.get('platte') == 'ja'
                 edit_dialog.open()
 
             def save_edit() -> None:
@@ -152,6 +179,8 @@ def register_stoma_analysis_pages(
                     'datum': str(edit_date_input.value or ''),
                     'zeit': quarter_hour_time(edit_time_input.value),
                     'konsistenz': str(edit_consistency_select.value or ''),
+                    'menge': str(edit_amount_select.value or DEFAULT_AMOUNT),
+                    'platte': bool(edit_plate_switch.value),
                 }
                 if not document['datum'] or not document['zeit'] or not document['konsistenz']:
                     ui.notify('Bitte alle Felder ausfuellen.', color='warning')
@@ -167,8 +196,11 @@ def register_stoma_analysis_pages(
 
             def open_delete(row: dict[str, str]) -> None:
                 delete_id['value'] = str(row.get('row_key', ''))
+                amount_text = f" {row.get('menge', '')}" if row.get('menge') else ''
+                plate_text = ' Platte' if row.get('platte') == 'ja' else ''
                 delete_label.set_text(
-                    f"{row.get('datum', '')} {row.get('zeit', '')} {row.get('konsistenz', '')}"
+                    f"{row.get('datum', '')} {row.get('zeit', '')} "
+                    f"{row.get('konsistenz', '')}{amount_text}{plate_text}"
                 )
                 delete_dialog.open()
 
@@ -195,3 +227,11 @@ def register_stoma_analysis_pages(
             date_to_input.on_value_change(load_entries)
             ui.button('Zurueck', on_click=lambda: ui.navigate.to('/')).props('outline') \
                 .classes('rounded-2xl px-6 py-3 text-base font-medium')
+
+    @ui.page('/stoma-auswerten')
+    def stoma_analysis_page() -> None:
+        render_stoma_analysis_page('Stoma Auswerten')
+
+    @ui.page('/tumor-auswerten')
+    def tumor_analysis_page() -> None:
+        render_stoma_analysis_page('Tumor Auswerten', 'Tumor')

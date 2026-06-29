@@ -8,7 +8,7 @@ env/
 venv/
 
 # Local configuration and runtime state
-#config.ini
+config.ini
 .nicegui/
 
 # Test and tool caches
