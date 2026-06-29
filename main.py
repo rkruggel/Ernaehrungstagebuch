@@ -17,7 +17,7 @@ from src.stoma.page import register_stoma_pages
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-APP_VERSION = '0.1.28'
+APP_VERSION = '0.1.29'
 
 
 DEFAULT_ESSEN_PLACES = ['Zuhause', 'Arbeit', 'Restaurant', 'Unterwegs']
@@ -578,7 +578,7 @@ def build_shell(title: str) -> None:
 def action_button(label: str, target: str, color: str) -> None:
     ui.button(label, on_click=lambda: ui.navigate.to(target)).props('unelevated') \
         .classes(
-            'w-64 max-w-full rounded-2xl px-8 py-5 text-xl font-semibold text-white shadow-lg'
+            'w-full rounded-2xl px-4 py-5 text-lg font-semibold text-white shadow-lg'
         ).style(f'background-color: {color}; min-height: 88px;')
 
 
@@ -592,12 +592,13 @@ def index_page() -> None:
         ui.label(f'Version {APP_VERSION} [{CONFIG.app.quelle}]') \
             .classes('text-xs text-slate-500 text-center')
         ui.label(DATABASE_STATUS).classes('text-sm text-slate-500 text-center')
-        action_button('Stoma', '/stoma', '#9b6b43')
-        action_button('Stoma Auswerten', '/stoma-auswerten', '#7f5539')
-        action_button('Tumor', '/tumor', '#b45353')
-        action_button('Tumor Auswerten', '/tumor-auswerten', '#8f3f46')
-        action_button('Essen', '/essen', '#4f8a5b')
-        action_button('Essen Auswerten', '/essen-auswerten', '#3f7048')
+        with ui.grid(columns=2).classes('w-full max-w-xl gap-4'):
+            action_button('Tumor', '/tumor', '#b45353')
+            action_button('Tumor Auswerten', '/tumor-auswerten', '#8f3f46')
+            action_button('Stoma', '/stoma', '#9b6b43')
+            action_button('Stoma Auswerten', '/stoma-auswerten', '#7f5539')
+            action_button('Essen', '/essen', '#4f8a5b')
+            action_button('Essen Auswerten', '/essen-auswerten', '#3f7048')
 
 
 register_stoma_pages(build_shell, save_couchdb_document)

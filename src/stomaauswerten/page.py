@@ -33,6 +33,8 @@ def register_stoma_analysis_pages(
         build_shell(title)
 
         today = date.today().isoformat()
+        show_consistency_field = consistency_filter != 'Tumor'
+        edit_title = 'Tumor ändern' if consistency_filter == 'Tumor' else 'Stoma ändern'
 
         with ui.column().classes('min-h-screen w-full items-center gap-5 px-6 py-10'):
             ui.label(title).classes('text-3xl font-bold text-slate-800 text-center')
@@ -53,13 +55,13 @@ def register_stoma_analysis_pages(
                 {'name': 'zeit', 'label': 'Zeit', 'field': 'zeit', 'align': 'left'},
             ]
             source_column = {'name': 'quelle', 'label': 'Quelle', 'field': 'quelle', 'align': 'left'}
+            consistency_column = {
+                'name': 'konsistenz',
+                'label': 'Konsistenz',
+                'field': 'konsistenz',
+                'align': 'left',
+            }
             data_columns = [
-                {
-                    'name': 'konsistenz',
-                    'label': 'Konsistenz',
-                    'field': 'konsistenz',
-                    'align': 'left',
-                },
                 {
                     'name': 'menge',
                     'label': 'Menge',
@@ -95,6 +97,8 @@ def register_stoma_analysis_pages(
                 columns = [*date_columns]
                 if source_switch.value:
                     columns.append(source_column)
+                if consistency_filter != 'Tumor':
+                    columns.append(consistency_column)
                 return [*columns, *data_columns, action_column]
 
             def update_columns() -> None:
@@ -135,15 +139,17 @@ def register_stoma_analysis_pages(
                 status_label.set_text(f'{len(rows)} Eintraege gefunden.')
 
             with ui.dialog() as edit_dialog, ui.card().classes('w-[360px] max-w-full gap-3'):
-                ui.label('Stoma ändern').classes('text-lg font-semibold text-slate-900')
+                ui.label(edit_title).classes('text-lg font-semibold text-slate-900')
                 edit_id = {'value': ''}
                 edit_date_input = ui.input('Datum').props('type=date dense').classes('w-full')
                 edit_time_input = ui.input('Zeit').props('type=time step=900 dense') \
                     .classes('w-full')
-                edit_consistency_select = ui.select(
-                    STOMA_CONSISTENCIES,
-                    label='Konsistenz',
-                ).props('dense options-dense').classes('w-full')
+                edit_consistency_select = None
+                if show_consistency_field:
+                    edit_consistency_select = ui.select(
+                        STOMA_CONSISTENCIES,
+                        label='Konsistenz',
+                    ).props('dense options-dense').classes('w-full')
                 edit_amount_select = ui.select(
                     AMOUNT_OPTIONS,
                     label='Menge',
@@ -168,7 +174,8 @@ def register_stoma_analysis_pages(
                 edit_id['value'] = str(row.get('row_key', ''))
                 edit_date_input.value = row.get('datum', '')
                 edit_time_input.value = quarter_hour_time(row.get('zeit', ''))
-                edit_consistency_select.value = row.get('konsistenz', '')
+                if edit_consistency_select is not None:
+                    edit_consistency_select.value = row.get('konsistenz', '')
                 edit_amount_select.value = row.get('menge') or DEFAULT_AMOUNT
                 edit_plate_switch.value = row.get('platte') == 'ja'
                 edit_dialog.open()
@@ -178,7 +185,11 @@ def register_stoma_analysis_pages(
                 document = {
                     'datum': str(edit_date_input.value or ''),
                     'zeit': quarter_hour_time(edit_time_input.value),
-                    'konsistenz': str(edit_consistency_select.value or ''),
+                    'konsistenz': (
+                        consistency_filter
+                        if consistency_filter
+                        else str(edit_consistency_select.value if edit_consistency_select else '')
+                    ),
                     'menge': str(edit_amount_select.value or DEFAULT_AMOUNT),
                     'platte': bool(edit_plate_switch.value),
                 }
