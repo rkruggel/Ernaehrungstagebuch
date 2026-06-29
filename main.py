@@ -17,7 +17,7 @@ from src.stoma.page import register_stoma_pages
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-APP_VERSION = '0.1.32'
+APP_VERSION = '0.1.33'
 
 
 DEFAULT_ESSEN_PLACES = ['Zuhause', 'Arbeit', 'Restaurant', 'Unterwegs']
@@ -267,6 +267,7 @@ def fetch_entries_by_type(
                     'zeit': str(document.get('zeit', '')),
                     'konsistenz': str(document.get('konsistenz', '')),
                     'menge': str(document.get('menge', '')),
+                    'farbe': str(document.get('farbe', '')),
                     'platte': 'ja' if document.get('platte') else 'nein',
                     'quelle': document_quelle(document),
                 }

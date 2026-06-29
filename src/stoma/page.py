@@ -9,8 +9,10 @@ SaveDocument = Callable[[dict[str, object]], str]
 
 CONSISTENCY_OPTIONS = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig']
 AMOUNT_OPTIONS = ['wenig', 'mittel', 'viel']
+COLOR_OPTIONS = ['klar', 'rosa', 'rot']
 LAST_CONSISTENCY_STORAGE_KEY = 'stoma_last_consistency'
 DEFAULT_AMOUNT = 'mittel'
+DEFAULT_COLOR = 'klar'
 STOMA_ENTRY_TYPE = 'stoma'
 TUMOR_ENTRY_TYPE = 'tumor'
 
@@ -39,6 +41,7 @@ def register_stoma_pages(build_shell: Callable[[str], None], save_document: Save
         initial_value: str | None = None,
         show_consistency_select: bool = True,
         show_amount_select: bool = False,
+        show_color_select: bool = False,
         show_plate_switch: bool = True,
         document_type: str = STOMA_ENTRY_TYPE,
         button_color: str = '#B77945',
@@ -81,6 +84,13 @@ def register_stoma_pages(build_shell: Callable[[str], None], save_document: Save
                     label='Menge',
                     value=DEFAULT_AMOUNT,
                 ).classes('w-64 max-w-full')
+            color_select = None
+            if show_color_select:
+                color_select = ui.select(
+                    COLOR_OPTIONS,
+                    label='Farbe',
+                    value=DEFAULT_COLOR,
+                ).classes('w-64 max-w-full')
 
             def save_entry() -> None:
                 timestamp = current_quarter_hour()
@@ -95,6 +105,8 @@ def register_stoma_pages(build_shell: Callable[[str], None], save_document: Save
                     document['platte'] = bool(plate_switch.value)
                 if amount_select is not None:
                     document['menge'] = amount_select.value or DEFAULT_AMOUNT
+                if color_select is not None:
+                    document['farbe'] = color_select.value or DEFAULT_COLOR
                 
                 try:
                     document_id = save_document(document)
@@ -127,6 +139,7 @@ def register_stoma_pages(build_shell: Callable[[str], None], save_document: Save
             'Tumor',
             show_consistency_select=False,
             show_amount_select=True,
+            show_color_select=True,
             show_plate_switch=False,
             document_type=TUMOR_ENTRY_TYPE,
             button_color='#B84A5A',

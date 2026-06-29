@@ -10,7 +10,9 @@ UpdateStomaEntry = Callable[[str, dict[str, object]], None]
 DeleteStomaEntry = Callable[[str], None]
 STOMA_CONSISTENCIES = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig']
 AMOUNT_OPTIONS = ['wenig', 'mittel', 'viel']
+COLOR_OPTIONS = ['klar', 'rosa', 'rot']
 DEFAULT_AMOUNT = 'mittel'
+DEFAULT_COLOR = 'klar'
 
 
 def quarter_hour_time(value: object) -> str:
@@ -38,6 +40,7 @@ def register_stoma_analysis_pages(
         update_entry: UpdateStomaEntry,
         delete_entry: DeleteStomaEntry,
         show_consistency_field: bool = True,
+        show_color_field: bool = False,
     ) -> None:
         build_shell(title)
 
@@ -67,6 +70,12 @@ def register_stoma_analysis_pages(
                 'name': 'konsistenz',
                 'label': 'Konsistenz',
                 'field': 'konsistenz',
+                'align': 'left',
+            }
+            color_column = {
+                'name': 'farbe',
+                'label': 'Farbe',
+                'field': 'farbe',
                 'align': 'left',
             }
             data_columns = [
@@ -107,6 +116,8 @@ def register_stoma_analysis_pages(
                     columns.append(source_column)
                 if show_consistency_field:
                     columns.append(consistency_column)
+                if show_color_field:
+                    columns.append(color_column)
                 return [*columns, *data_columns, action_column]
 
             def update_columns() -> None:
@@ -152,6 +163,13 @@ def register_stoma_analysis_pages(
                         STOMA_CONSISTENCIES,
                         label='Konsistenz',
                     ).props('dense options-dense').classes('w-full')
+                edit_color_select = None
+                if show_color_field:
+                    edit_color_select = ui.select(
+                        COLOR_OPTIONS,
+                        label='Farbe',
+                        value=DEFAULT_COLOR,
+                    ).props('dense options-dense').classes('w-full')
                 edit_amount_select = ui.select(
                     AMOUNT_OPTIONS,
                     label='Menge',
@@ -178,6 +196,8 @@ def register_stoma_analysis_pages(
                 edit_time_input.value = quarter_hour_time(row.get('zeit', ''))
                 if edit_consistency_select is not None:
                     edit_consistency_select.value = row.get('konsistenz', '')
+                if edit_color_select is not None:
+                    edit_color_select.value = row.get('farbe') or DEFAULT_COLOR
                 edit_amount_select.value = row.get('menge') or DEFAULT_AMOUNT
                 edit_plate_switch.value = row.get('platte') == 'ja'
                 edit_dialog.open()
@@ -194,10 +214,15 @@ def register_stoma_analysis_pages(
                     document['konsistenz'] = str(
                         edit_consistency_select.value if edit_consistency_select else ''
                     )
+                if show_color_field:
+                    document['farbe'] = str(
+                        edit_color_select.value if edit_color_select else DEFAULT_COLOR
+                    )
                 if (
                     not document['datum']
                     or not document['zeit']
                     or (show_consistency_field and not document['konsistenz'])
+                    or (show_color_field and not document['farbe'])
                 ):
                     ui.notify('Bitte alle Felder ausfuellen.', color='warning')
                     return
@@ -213,6 +238,7 @@ def register_stoma_analysis_pages(
             def open_delete(row: dict[str, str]) -> None:
                 delete_id['value'] = str(row.get('row_key', ''))
                 amount_text = f" {row.get('menge', '')}" if row.get('menge') else ''
+                color_text = f" {row.get('farbe', '')}" if row.get('farbe') else ''
                 plate_text = ' Platte' if row.get('platte') == 'ja' else ''
                 consistency_text = (
                     f"{row.get('konsistenz', '')}"
@@ -221,7 +247,7 @@ def register_stoma_analysis_pages(
                 )
                 delete_label.set_text(
                     f"{row.get('datum', '')} {row.get('zeit', '')} "
-                    f"{consistency_text}{amount_text}{plate_text}"
+                    f"{consistency_text}{color_text}{amount_text}{plate_text}"
                 )
                 delete_dialog.open()
 
@@ -266,4 +292,5 @@ def register_stoma_analysis_pages(
             update_tumor_entry,
             delete_tumor_entry,
             show_consistency_field=False,
+            show_color_field=True,
         )
