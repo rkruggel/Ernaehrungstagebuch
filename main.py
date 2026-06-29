@@ -17,7 +17,7 @@ from src.sstoma.page import register_stoma_pages
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-APP_VERSION = '0.1.33'
+APP_VERSION = '0.1.34'
 
 
 DEFAULT_ESSEN_PLACES = ['Zuhause', 'Arbeit', 'Restaurant', 'Unterwegs']

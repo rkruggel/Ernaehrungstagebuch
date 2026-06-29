@@ -2,16 +2,16 @@
   "files.autoSave": "afterDelay",
   "files.autoSaveDelay": 1000,
   "files.exclude": {
-    "**/__pycache__": true,
-    "**/*.pyc": true,
     ".venv": true,
-    "config.ini": true
+    "**/__pycache__": true,
+    "**/*.pyc": true
   },
   "search.exclude": {
     "**/__pycache__": true,
     "**/*.pyc": true,
     ".venv": true,
     "config.ini": true
-  }
+  },
+  "editor.tabSize": 6
 }
  

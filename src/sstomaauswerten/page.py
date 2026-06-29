@@ -40,6 +40,7 @@ def register_stoma_analysis_pages(
         update_entry: UpdateStomaEntry,
         delete_entry: DeleteStomaEntry,
         show_consistency_field: bool = True,
+        show_amount_field: bool = False,
         show_color_field: bool = False,
     ) -> None:
         build_shell(title)
@@ -78,13 +79,13 @@ def register_stoma_analysis_pages(
                 'field': 'farbe',
                 'align': 'left',
             }
+            amount_column = {
+                'name': 'menge',
+                'label': 'Menge',
+                'field': 'menge',
+                'align': 'left',
+            }
             data_columns = [
-                {
-                    'name': 'menge',
-                    'label': 'Menge',
-                    'field': 'menge',
-                    'align': 'left',
-                },
                 {
                     'name': 'platte',
                     'label': 'Platte',
@@ -118,6 +119,8 @@ def register_stoma_analysis_pages(
                     columns.append(consistency_column)
                 if show_color_field:
                     columns.append(color_column)
+                if show_amount_field:
+                    columns.append(amount_column)
                 return [*columns, *data_columns, action_column]
 
             def update_columns() -> None:
@@ -170,11 +173,13 @@ def register_stoma_analysis_pages(
                         label='Farbe',
                         value=DEFAULT_COLOR,
                     ).props('dense options-dense').classes('w-full')
-                edit_amount_select = ui.select(
-                    AMOUNT_OPTIONS,
-                    label='Menge',
-                    value=DEFAULT_AMOUNT,
-                ).props('dense options-dense').classes('w-full')
+                edit_amount_select = None
+                if show_amount_field:
+                    edit_amount_select = ui.select(
+                        AMOUNT_OPTIONS,
+                        label='Menge',
+                        value=DEFAULT_AMOUNT,
+                    ).props('dense options-dense').classes('w-full')
                 edit_plate_switch = ui.switch('Platte', value=False).props('dense')
                 with ui.row().classes('w-full justify-end gap-2'):
                     ui.button('Abbrechen', on_click=edit_dialog.close).props('flat no-caps dense')
@@ -198,7 +203,8 @@ def register_stoma_analysis_pages(
                     edit_consistency_select.value = row.get('konsistenz', '')
                 if edit_color_select is not None:
                     edit_color_select.value = row.get('farbe') or DEFAULT_COLOR
-                edit_amount_select.value = row.get('menge') or DEFAULT_AMOUNT
+                if edit_amount_select is not None:
+                    edit_amount_select.value = row.get('menge') or DEFAULT_AMOUNT
                 edit_plate_switch.value = row.get('platte') == 'ja'
                 edit_dialog.open()
 
@@ -207,9 +213,12 @@ def register_stoma_analysis_pages(
                 document = {
                     'datum': str(edit_date_input.value or ''),
                     'zeit': quarter_hour_time(edit_time_input.value),
-                    'menge': str(edit_amount_select.value or DEFAULT_AMOUNT),
                     'platte': bool(edit_plate_switch.value),
                 }
+                if show_amount_field:
+                    document['menge'] = str(
+                        edit_amount_select.value if edit_amount_select else DEFAULT_AMOUNT
+                    )
                 if show_consistency_field:
                     document['konsistenz'] = str(
                         edit_consistency_select.value if edit_consistency_select else ''
@@ -237,7 +246,11 @@ def register_stoma_analysis_pages(
 
             def open_delete(row: dict[str, str]) -> None:
                 delete_id['value'] = str(row.get('row_key', ''))
-                amount_text = f" {row.get('menge', '')}" if row.get('menge') else ''
+                amount_text = (
+                    f" {row.get('menge', '')}"
+                    if show_amount_field and row.get('menge')
+                    else ''
+                )
                 color_text = f" {row.get('farbe', '')}" if row.get('farbe') else ''
                 plate_text = ' Platte' if row.get('platte') == 'ja' else ''
                 consistency_text = (
@@ -292,5 +305,6 @@ def register_stoma_analysis_pages(
             update_tumor_entry,
             delete_tumor_entry,
             show_consistency_field=False,
+            show_amount_field=True,
             show_color_field=True,
         )
