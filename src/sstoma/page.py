@@ -81,5 +81,5 @@ def register_stoma_pages(build_shell: Callable[[str], None], save_document: Save
             timestamp_label = ui.label('').classes(
                 'text-base font-medium text-slate-700 text-center'
             )
-            ui.button('Zurueck', on_click=lambda: ui.navigate.to('/')).props('outline') \
+            ui.button('Zurueck', on_click=lambda: ui.run_javascript("window.location.replace('/')")).props('outline') \
                 .classes('rounded-2xl px-6 py-3 text-base font-medium')

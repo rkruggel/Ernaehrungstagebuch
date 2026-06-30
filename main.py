@@ -10,7 +10,7 @@ Beschreibung:
 
 Autor: Roland Kruggel
 Version: 0.1.37
-Start: 16.06.2026
+Start: 21.06.2026
 Lizens: MIT
 """
 
@@ -33,7 +33,7 @@ from src.stumor.page import register_tumor_pages
 
 
 logging.basicConfig(level=logging.INFO)
-APP_VERSION = '0.1.37'
+APP_VERSION = '0.1.39'
 
 
 REQUIRED_CONFIG_OPTIONS = {

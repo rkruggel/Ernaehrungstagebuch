@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from nicegui import ui
 
@@ -9,6 +9,7 @@ FetchStomaEntries = Callable[[str, str], list[dict[str, str]]]
 UpdateStomaEntry = Callable[[str, dict[str, object]], None]
 DeleteStomaEntry = Callable[[str], None]
 STOMA_CONSISTENCIES = ['sehr hart', 'hart', 'normal', 'weich', 'sehr weich', 'flüssig']
+STOMA_ANALYSIS_COLOR = '#6F5A3C'
 
 
 def quarter_hour_time(value: object) -> str:
@@ -41,6 +42,16 @@ def register_stoma_analysis_pages(
                 date_to_input = ui.input('Datum bis', value=today).props('type=date') \
                     .classes('w-32 max-w-full')
                 source_switch = ui.switch(value=False).props('dense')
+                with ui.button_group().props('unelevated'):
+                    ui.button(icon='chevron_left', on_click=lambda: shift_date_range(-1)) \
+                        .props('aria-label="Vorheriger Tag"') \
+                        .style(f'background: {STOMA_ANALYSIS_COLOR} !important; color: white;')
+                    ui.button(icon='home', on_click=lambda: jump_to_today()) \
+                        .props('aria-label="Heute"') \
+                        .style(f'background: {STOMA_ANALYSIS_COLOR} !important; color: white;')
+                    ui.button(icon='chevron_right', on_click=lambda: shift_date_range(1)) \
+                        .props('aria-label="Nächster Tag"') \
+                        .style(f'background: {STOMA_ANALYSIS_COLOR} !important; color: white;')
 
             date_columns = [
                 {'name': 'datum', 'label': 'Datum', 'field': 'datum', 'align': 'left'},
@@ -113,6 +124,27 @@ def register_stoma_analysis_pages(
                 result_table.rows = rows
                 result_table.update()
                 status_label.set_text(f'{len(rows)} Eintraege gefunden.')
+
+            def set_date_range(date_from: date, date_to: date) -> None:
+                date_from_input.value = date_from.isoformat()
+                date_to_input.value = date_to.isoformat()
+                load_entries()
+
+            def shift_date_range(days: int) -> None:
+                try:
+                    date_from = date.fromisoformat(str(date_from_input.value or ''))
+                    date_to = date.fromisoformat(str(date_to_input.value or ''))
+                except ValueError:
+                    status_label.set_text('Bitte Datum von und Datum bis ausfuellen.')
+                    return
+                set_date_range(
+                    date_from + timedelta(days=days),
+                    date_to + timedelta(days=days),
+                )
+
+            def jump_to_today() -> None:
+                today_date = date.today()
+                set_date_range(today_date, today_date)
 
             with ui.dialog() as edit_dialog, ui.card().classes('w-[360px] max-w-full gap-3'):
                 ui.label('Stoma ändern').classes('text-lg font-semibold text-slate-900')
@@ -198,5 +230,5 @@ def register_stoma_analysis_pages(
             date_from_input.on_value_change(load_entries)
             date_to_input.on_value_change(load_entries)
             load_entries()
-            ui.button('Zurueck', on_click=lambda: ui.navigate.to('/')).props('outline') \
+            ui.button('Zurueck', on_click=lambda: ui.run_javascript("window.location.replace('/')")).props('outline') \
                 .classes('rounded-2xl px-6 py-3 text-base font-medium')
