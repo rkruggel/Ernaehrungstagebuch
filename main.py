@@ -35,7 +35,7 @@ from src.stumor.page import register_tumor_pages
 
 
 logging.basicConfig(level=logging.INFO)
-APP_VERSION = '0.1.41'
+APP_VERSION = '0.1.46'
 
 
 REQUIRED_CONFIG_OPTIONS = {
@@ -108,37 +108,94 @@ def build_shell(title: str) -> None:
             body {
                 background: linear-gradient(180deg, #f7f4ea 0%, #e4efe7 100%);
             }
+            .menu-fab-button {
+                flex: 0 0 40px !important;
+                min-height: 88px;
+                min-width: 0 !important;
+                width: 40px !important;
+            }
+            .menu-fab-button > .q-btn {
+                min-width: 0 !important;
+                width: 100%;
+                min-height: 88px;
+                background: var(--menu-fab-color) !important;
+                color: white !important;
+                border-radius: 1rem;
+                padding: 1rem 0.5rem;
+                box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1),
+                    0 4px 6px -4px rgb(0 0 0 / 0.1);
+            }
+            .menu-fab-button .q-icon {
+                font-size: 1.25rem;
+            }
+            .menu-action-button {
+                min-width: 0 !important;
+            }
+            .menu-action-button .q-btn__content {
+                min-width: 0;
+                white-space: normal;
+                text-align: center;
+                line-height: 1.2;
+            }
+            @media (min-width: 640px) {
+                .menu-fab-button {
+                    flex: 0 0 56px !important;
+                    width: 56px !important;
+                }
+                .menu-fab-button > .q-btn {
+                    padding: 1.25rem 1rem;
+                }
+            }
         </style>
         '''
     )
 
 
-def action_button(label: str, target: str, color: str) -> None:
-    ui.button(label, on_click=lambda: ui.navigate.to(target)).props('unelevated') \
+def action_button(label: str, target: str, color: str):
+    return ui.button(label, on_click=lambda: ui.navigate.to(target)).props('unelevated') \
         .classes(
-            'w-full rounded-2xl px-4 py-5 text-lg font-semibold text-white shadow-lg'
+            'menu-action-button min-w-0 w-full rounded-2xl px-2 py-4 text-base '
+            'font-semibold leading-tight text-white shadow-lg sm:px-4 sm:py-5 sm:text-lg'
         ).style(f'background: {color} !important; color: white !important; min-height: 88px;')
+
+
+def menu_options_fab(color: str) -> None:
+    with ui.fab('more_horiz', direction='left', color='primary') \
+            .props('unelevated') \
+            .classes('menu-fab-button') \
+            .style(f'--menu-fab-color: {color};'):
+        ui.fab_action('filter_1', label='L1', color='primary')
+
+
+def menu_button_row(
+    label: str,
+    target: str,
+    color: str,
+    analysis_label: str,
+    analysis_target: str,
+    analysis_color: str,
+) -> None:
+    with ui.row().classes('w-full flex-nowrap gap-1 sm:gap-4'):
+        action_button(label, target, color).classes('flex-1 min-w-0')
+        action_button(analysis_label, analysis_target, analysis_color).classes('flex-1 min-w-0')
+        menu_options_fab(analysis_color)
 
 
 @ui.page('/')
 def index_page() -> None:
     build_shell(CONFIG.app.title)
 
-    with ui.column().classes('min-h-screen w-full items-center gap-5 px-6 pt-28'):
+    with ui.column().classes('min-h-screen w-full items-center gap-5 px-2 pt-28 sm:px-6'):
         ui.label('Rolands').classes('text-xs font-light text-slate-500 text-center -mb-4')
         ui.label(CONFIG.app.title).classes('text-3xl font-bold text-slate-800 text-center')
         ui.label(f'Version {APP_VERSION} [{CONFIG.app.quelle}]') \
             .classes('text-xs text-slate-500 text-center')
         ui.label(DATABASE_STATUS).classes('text-sm text-slate-500 text-center')
-        with ui.grid(columns=2).classes('w-full max-w-xl gap-4'):
-            action_button('Tumor', '/tumor', '#B84A5A')
-            action_button('Tumor Auswerten', '/tumor-auswerten', '#7E3A54')
-            action_button('Stoma', '/stoma', '#B77945')
-            action_button('Stoma Auswerten', '/stoma-auswerten', '#6F5A3C')
-            action_button('Essen', '/essen', '#4F8F6B')
-            action_button('Essen Auswerten', '/essen-auswerten', '#2F6F73')
-            action_button('Medis', '/medis', '#5D6EAD')
-            action_button('Medis Auswerten', '/medis-auswerten', '#34497F')
+        with ui.column().classes('w-full max-w-xl gap-3 sm:gap-4'):
+            menu_button_row('Tumor', '/tumor', '#B84A5A', 'Tumor Ausw.', '/tumor-auswerten', '#7E3A54')
+            menu_button_row('Stoma', '/stoma', '#B77945', 'Stoma Ausw.', '/stoma-auswerten', '#6F5A3C')
+            menu_button_row('Essen', '/essen', '#4F8F6B', 'Essen Ausw.', '/essen-auswerten', '#2F6F73')
+            menu_button_row('Medis', '/medis', '#5D6EAD', 'Medis Ausw.', '/medis-auswerten', '#34497F')
 
 
 register_stoma_pages(build_shell, DATABASE.save_document)
