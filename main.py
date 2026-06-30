@@ -26,6 +26,8 @@ from nicegui import ui
 from src.database import CouchDatabase
 from src.sessenauswerten.page import register_essen_analysis_pages
 from src.sessen.page import register_essen_pages
+from src.smedisauswerten.page import register_medis_analysis_pages
+from src.smedis.page import register_medis_pages
 from src.sstomaauswerten.page import register_stoma_analysis_pages
 from src.sstoma.page import register_stoma_pages
 from src.stumorauswerten.page import register_tumor_analysis_pages
@@ -33,7 +35,7 @@ from src.stumor.page import register_tumor_pages
 
 
 logging.basicConfig(level=logging.INFO)
-APP_VERSION = '0.1.40'
+APP_VERSION = '0.1.41'
 
 
 REQUIRED_CONFIG_OPTIONS = {
@@ -135,6 +137,8 @@ def index_page() -> None:
             action_button('Stoma Auswerten', '/stoma-auswerten', '#6F5A3C')
             action_button('Essen', '/essen', '#4F8F6B')
             action_button('Essen Auswerten', '/essen-auswerten', '#2F6F73')
+            action_button('Medis', '/medis', '#5D6EAD')
+            action_button('Medis Auswerten', '/medis-auswerten', '#34497F')
 
 
 register_stoma_pages(build_shell, DATABASE.save_document)
@@ -164,6 +168,22 @@ register_essen_analysis_pages(
     DATABASE.fetch_essen_entries,
     DATABASE.update_essen_entry,
     DATABASE.delete_essen_entry,
+)
+register_medis_pages(
+    build_shell,
+    DATABASE.save_document,
+    DATABASE.fetch_medis_options,
+    DATABASE.add_medis_option,
+    DATABASE.delete_medis_option,
+    DATABASE.rename_medis_option,
+)
+register_medis_analysis_pages(
+    build_shell,
+    DATABASE.fetch_medis_entries,
+    DATABASE.update_medis_entry,
+    DATABASE.delete_medis_entry,
+    DATABASE.fetch_medis_options,
+    DATABASE.add_medis_option,
 )
 
 

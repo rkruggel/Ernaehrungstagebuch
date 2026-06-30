@@ -11,6 +11,8 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_ESSEN_PLACES = ['Zuhause', 'Arbeit', 'Restaurant', 'Unterwegs']
 ESSEN_PLACES_OPTION_NAME = 'essen_wo_gegessen'
+MEDIS_OPTION_NAME = 'medis_medikament'
+MEDIS_ENTRY_TYPE = 'medis'
 STOMA_ENTRY_TYPE = 'stoma'
 TUMOR_ENTRY_TYPE = 'tumor'
 
@@ -56,6 +58,45 @@ class CouchDatabase:
 
     def fetch_tumor_entries(self, date_from: str, date_to: str) -> list[dict[str, str]]:
         return self._fetch_entries_by_type(date_from, date_to, TUMOR_ENTRY_TYPE)
+
+    def fetch_medis_entries(self, date_from: str, date_to: str) -> list[dict[str, str]]:
+        session = self._session()
+        database_url = self._database_url()
+        response = session.get(
+            f'{database_url}/_all_docs',
+            params={'include_docs': 'true'},
+            timeout=10,
+        )
+        response.raise_for_status()
+
+        entries = []
+        for row in response.json()['rows']:
+            document = row.get('doc')
+            if (
+                not document
+                or document.get('typ') != MEDIS_ENTRY_TYPE
+                or not self._document_matches_quelle(document)
+            ):
+                continue
+
+            entry_date = str(document.get('datum', ''))
+            if date_from <= entry_date <= date_to:
+                entries.append(
+                    {
+                        'row_key': str(
+                            document.get('_id', f'{entry_date}-{document.get("zeit", "")}')
+                        ),
+                        'datum': entry_date,
+                        'zeit': str(document.get('zeit', '')),
+                        'medikament': str(document.get('medikament', '')),
+                        'quelle': self._document_quelle(document),
+                    }
+                )
+
+        return sorted(
+            entries,
+            key=lambda entry: (entry['datum'], self._time_sort_key(entry['zeit'])),
+        )
 
     def fetch_essen_entries(self, date_from: str, date_to: str) -> list[dict[str, str]]:
         session = self._session()
@@ -109,6 +150,12 @@ class CouchDatabase:
 
     def delete_tumor_entry(self, document_id: str) -> None:
         self._delete_entry(document_id, TUMOR_ENTRY_TYPE)
+
+    def update_medis_entry(self, document_id: str, values: dict[str, object]) -> None:
+        self._update_entry(document_id, MEDIS_ENTRY_TYPE, values)
+
+    def delete_medis_entry(self, document_id: str) -> None:
+        self._delete_entry(document_id, MEDIS_ENTRY_TYPE)
 
     def update_essen_entry(self, document_id: str, values: dict[str, object]) -> None:
         self._update_entry(document_id, 'essen', values)
@@ -176,6 +223,70 @@ class CouchDatabase:
                 continue
 
             entry['wo_gegessen'] = new_text
+            self._save_named_document(session, database_url, entry)
+
+        return self._clean_option_values(document['werte'])
+
+    def fetch_medis_options(self) -> list[str]:
+        session = self._session()
+        database_url = self._database_url()
+        document = self._load_medis_options_document(session, database_url)
+        return self._clean_option_values(document.get('werte', []))
+
+    def add_medis_option(self, medication: str) -> list[str]:
+        session = self._session()
+        database_url = self._database_url()
+        document = self._load_medis_options_document(session, database_url)
+        values = self._clean_option_values(document.get('werte', []))
+        document['werte'] = self._clean_option_values([*values, medication])
+        self._save_named_document(session, database_url, document)
+        return self._clean_option_values(document['werte'])
+
+    def delete_medis_option(self, medication: str) -> list[str]:
+        session = self._session()
+        database_url = self._database_url()
+        document = self._load_medis_options_document(session, database_url)
+        values = self._clean_option_values(document.get('werte', []))
+        document['werte'] = [value for value in values if value != medication]
+        self._save_named_document(session, database_url, document)
+        return self._clean_option_values(document['werte'])
+
+    def rename_medis_option(self, old_medication: str, new_medication: str) -> list[str]:
+        old_text = str(old_medication or '').strip()
+        new_text = str(new_medication or '').strip()
+        session = self._session()
+        database_url = self._database_url()
+        document = self._load_medis_options_document(session, database_url)
+
+        if not old_text or not new_text:
+            return self._clean_option_values(document.get('werte', []))
+
+        values = self._clean_option_values(document.get('werte', []))
+        document['werte'] = self._clean_option_values(
+            [new_text if value == old_text else value for value in values]
+        )
+        self._save_named_document(session, database_url, document)
+
+        if old_text == new_text:
+            return self._clean_option_values(document['werte'])
+
+        response = session.get(
+            f'{database_url}/_all_docs',
+            params={'include_docs': 'true'},
+            timeout=10,
+        )
+        response.raise_for_status()
+        for row in response.json()['rows']:
+            entry = row.get('doc')
+            if (
+                not entry
+                or entry.get('typ') != MEDIS_ENTRY_TYPE
+                or not self._document_matches_quelle(entry)
+                or str(entry.get('medikament') or '').strip() != old_text
+            ):
+                continue
+
+            entry['medikament'] = new_text
             self._save_named_document(session, database_url, entry)
 
         return self._clean_option_values(document['werte'])
@@ -365,6 +476,9 @@ class CouchDatabase:
     def _essen_places_document_id(self) -> str:
         return f'optionen:{self.config.app.quelle}:{ESSEN_PLACES_OPTION_NAME}'
 
+    def _medis_options_document_id(self) -> str:
+        return f'optionen:{self.config.app.quelle}:{MEDIS_OPTION_NAME}'
+
     def _fetch_legacy_essen_places(
         self,
         session: requests.Session,
@@ -418,6 +532,61 @@ class CouchDatabase:
         document['werte'] = self._clean_option_values(document.get('werte', []))
         document['typ'] = 'optionen'
         document['name'] = ESSEN_PLACES_OPTION_NAME
+        document['quelle'] = self.config.app.quelle
+        document['app_version'] = self.app_version
+        return document
+
+    def _fetch_legacy_medis_options(
+        self,
+        session: requests.Session,
+        database_url: str,
+    ) -> list[str]:
+        response = session.get(
+            f'{database_url}/_all_docs',
+            params={'include_docs': 'true'},
+            timeout=10,
+        )
+        response.raise_for_status()
+
+        medications = set()
+        for row in response.json()['rows']:
+            document = row.get('doc')
+            if (
+                not document
+                or document.get('typ') != MEDIS_ENTRY_TYPE
+                or not self._document_matches_quelle(document)
+            ):
+                continue
+
+            medication = str(document.get('medikament') or '').strip()
+            if medication:
+                medications.add(medication)
+
+        return self._clean_option_values(medications)
+
+    def _load_medis_options_document(
+        self,
+        session: requests.Session,
+        database_url: str,
+    ) -> dict[str, object]:
+        document_id = self._medis_options_document_id()
+        document = self._fetch_document(session, database_url, document_id)
+
+        if document is None:
+            document = {
+                '_id': document_id,
+                'typ': 'optionen',
+                'name': MEDIS_OPTION_NAME,
+                'quelle': self.config.app.quelle,
+                'werte': self._fetch_legacy_medis_options(session, database_url),
+                'app_version': self.app_version,
+            }
+            self._save_named_document(session, database_url, document)
+            return document
+
+        document['werte'] = self._clean_option_values(document.get('werte', []))
+        document['typ'] = 'optionen'
+        document['name'] = MEDIS_OPTION_NAME
         document['quelle'] = self.config.app.quelle
         document['app_version'] = self.app_version
         return document
