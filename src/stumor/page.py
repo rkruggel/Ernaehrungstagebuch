@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 
-from nicegui import ui
+from nicegui import app, ui
 
 SaveDocument = Callable[[dict[str, object]], str]
 
@@ -11,7 +11,21 @@ AMOUNT_OPTIONS = ['wenig', 'mittel', 'viel']
 COLOR_OPTIONS = ['klar', 'rosa', 'rot']
 DEFAULT_AMOUNT = 'mittel'
 DEFAULT_COLOR = 'klar'
+LAST_AMOUNT_STORAGE_KEY = 'tumor_last_amount'
+LAST_COLOR_STORAGE_KEY = 'tumor_last_color'
 TUMOR_ENTRY_TYPE = 'tumor'
+
+
+def prioritize_option(options: list[str], selected_value: object) -> list[str]:
+    selected = str(selected_value or '').strip()
+    if not selected or selected not in options:
+        return list(options)
+    return [selected, *[option for option in options if option != selected]]
+
+
+def remembered_option(storage_key: str, options: list[str], default_value: str) -> str:
+    selected = str(app.storage.user.get(storage_key, '') or '').strip()
+    return selected if selected in options else default_value
 
 
 def current_quarter_hour() -> datetime:
@@ -27,16 +41,37 @@ def register_tumor_pages(build_shell: Callable[[str], None], save_document: Save
 
         with ui.column().classes('min-h-screen w-full items-center justify-center gap-5 px-6'):
             ui.label('Tumor').classes('text-3xl font-bold text-slate-800 text-center')
+            initial_amount = remembered_option(LAST_AMOUNT_STORAGE_KEY, AMOUNT_OPTIONS, DEFAULT_AMOUNT)
+            initial_color = remembered_option(LAST_COLOR_STORAGE_KEY, COLOR_OPTIONS, DEFAULT_COLOR)
             amount_select = ui.select(
-                AMOUNT_OPTIONS,
+                prioritize_option(AMOUNT_OPTIONS, initial_amount),
                 label='Menge',
-                value=DEFAULT_AMOUNT,
+                value=initial_amount,
             ).classes('w-64 max-w-full')
             color_select = ui.select(
-                COLOR_OPTIONS,
+                prioritize_option(COLOR_OPTIONS, initial_color),
                 label='Farbe',
-                value=DEFAULT_COLOR,
+                value=initial_color,
             ).classes('w-64 max-w-full')
+
+            def update_amount_selection() -> None:
+                if amount_select.value:
+                    app.storage.user[LAST_AMOUNT_STORAGE_KEY] = amount_select.value
+                amount_select.set_options(
+                    prioritize_option(AMOUNT_OPTIONS, amount_select.value),
+                    value=amount_select.value,
+                )
+
+            def update_color_selection() -> None:
+                if color_select.value:
+                    app.storage.user[LAST_COLOR_STORAGE_KEY] = color_select.value
+                color_select.set_options(
+                    prioritize_option(COLOR_OPTIONS, color_select.value),
+                    value=color_select.value,
+                )
+
+            amount_select.on_value_change(lambda _: update_amount_selection())
+            color_select.on_value_change(lambda _: update_color_selection())
 
             def save_entry() -> None:
                 timestamp = current_quarter_hour()

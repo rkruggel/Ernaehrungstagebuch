@@ -33,7 +33,7 @@ from src.stumor.page import register_tumor_pages
 
 
 logging.basicConfig(level=logging.INFO)
-APP_VERSION = '0.1.39'
+APP_VERSION = '0.1.40'
 
 
 REQUIRED_CONFIG_OPTIONS = {

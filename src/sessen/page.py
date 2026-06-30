@@ -227,17 +227,20 @@ def register_essen_pages(
             except Exception:
                 place_options = ['Zuhause', 'Arbeit', 'Restaurant', 'Unterwegs']
 
+            initial_meal = default_meal()
             meal_select = ui.select(
-                prioritize_option(MEAL_OPTIONS, default_meal()),
+                prioritize_option(MEAL_OPTIONS, initial_meal),
                 label='Mahlzeit',
-                value=default_meal(),
+                value=initial_meal,
             ).props('dense options-dense').classes('w-64 max-w-full')
-            meal_select.on_value_change(
-                lambda _: meal_select.set_options(
+
+            def update_meal_selection() -> None:
+                meal_select.set_options(
                     prioritize_option(MEAL_OPTIONS, meal_select.value),
                     value=meal_select.value,
                 )
-            )
+
+            meal_select.on_value_change(lambda _: update_meal_selection())
             place_select = EditableOptionsSelect(
                 'Wo gegessen',
                 place_options,
