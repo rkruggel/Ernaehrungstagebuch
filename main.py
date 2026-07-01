@@ -9,7 +9,7 @@ Beschreibung:
 	Startpunkt und Konfiguration der Ernährungstagebuch- und Stoma-/Tumor-Dokumentationsanwendung.
 
 Autor: Roland Kruggel
-Version: 0.1.37
+Version: 1.0.0
 Start: 21.06.2026
 Lizens: MIT
 """
@@ -17,7 +17,9 @@ Lizens: MIT
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from configparser import ConfigParser
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -35,7 +37,13 @@ from src.stumor.page import register_tumor_pages
 
 
 logging.basicConfig(level=logging.INFO)
-APP_VERSION = '0.1.48'
+APP_VERSION = '0.1.57'
+T_LIST_ROW_COLORS = {
+    'Tumor': 'rgba(184, 74, 90, 0.10)',
+    'Stoma': 'rgba(183, 121, 69, 0.10)',
+    'Essen': 'rgba(79, 143, 107, 0.10)',
+    'Medis': 'rgba(93, 110, 173, 0.10)',
+}
 
 
 REQUIRED_CONFIG_OPTIONS = {
@@ -114,7 +122,19 @@ def action_button(label: str, target: str, color: str):
         ).style(f'background: {color} !important; color: white !important; min-height: 88px;')
 
 
-def menu_options_fab(color: str, fab_group: list) -> None:
+def time_sort_key(value: object) -> tuple[int, int]:
+    try:
+        parsed_time = datetime.strptime(str(value or '').split('-', 1)[0], '%H:%M')
+    except ValueError:
+        return (99, 99)
+    return (parsed_time.hour, parsed_time.minute)
+
+
+def menu_options_fab(
+    color: str,
+    fab_group: list,
+    extra_actions: list[dict[str, object]] | None = None,
+) -> None:
     fab = ui.fab('more_horiz', direction='left', color='primary') \
         .props('unelevated') \
         .classes('menu-fab-button') \
@@ -132,6 +152,17 @@ def menu_options_fab(color: str, fab_group: list) -> None:
 
     with fab:
         ui.fab_action('filter_1', label='L1', color='primary')
+        for action in extra_actions or []:
+            action_kwargs = {}
+            on_click = action.get('on_click')
+            if callable(on_click):
+                action_kwargs['on_click'] = on_click
+            ui.fab_action(
+                str(action['icon']),
+                label=str(action['label']),
+                color='primary',
+                **action_kwargs,
+            )
 
 
 def menu_button_row(
@@ -142,12 +173,13 @@ def menu_button_row(
     analysis_target: str,
     analysis_color: str,
     fab_group: list,
+    extra_fab_actions: list[dict[str, object]] | None = None,
 ) -> None:
     with ui.row().classes('w-full flex-nowrap gap-1 sm:gap-4'):
         action_button(label, target, color).classes('menu-main-button min-w-0')
         action_button(analysis_label, analysis_target, analysis_color) \
             .classes('menu-analysis-button min-w-0')
-        menu_options_fab(analysis_color, fab_group)
+        menu_options_fab(analysis_color, fab_group, extra_fab_actions)
 
 
 @ui.page('/')
@@ -160,11 +192,199 @@ def index_page() -> None:
         ui.label(f'Version {APP_VERSION} [{CONFIG.app.quelle}]') \
             .classes('text-xs text-slate-500 text-center')
         ui.label(DATABASE_STATUS).classes('text-sm text-slate-500 text-center')
+
+        with ui.dialog().props('position=top') as t_list_dialog, ui.card().classes(
+            'w-[920px] max-w-full gap-4'
+        ):
+            ui.label('T-Liste').classes('text-lg font-semibold text-slate-900')
+            with ui.row().classes('w-full flex-wrap items-end gap-4'):
+                today = date.today().isoformat()
+                t_list_date_from_input = ui.input('Datum von', value=today) \
+                    .props('type=date dense') \
+                    .classes('w-28 max-w-full')
+                t_list_date_to_input = ui.input('Datum bis', value=today) \
+                    .props('type=date dense') \
+                    .classes('w-28 max-w-full')
+                with ui.button_group().props('unelevated'):
+                    ui.button(icon='chevron_left', on_click=lambda: shift_t_list_date_range(-1)) \
+                        .props('aria-label="Vorheriger Tag"')
+                    ui.button(icon='home', on_click=lambda: jump_t_list_to_today()) \
+                        .props('aria-label="Heute"')
+                    ui.button(icon='chevron_right', on_click=lambda: shift_t_list_date_range(1)) \
+                        .props('aria-label="Nächster Tag"')
+            with ui.row().classes('w-full flex-wrap items-center gap-4'):
+                tumor_checkbox = ui.checkbox('Tumor', value=False).props('dense')
+                stoma_checkbox = ui.checkbox('Stoma', value=False).props('dense')
+                essen_checkbox = ui.checkbox('Essen', value=False).props('dense')
+                medis_checkbox = ui.checkbox('Medis', value=False).props('dense')
+                ui.button(icon='done_all', on_click=lambda: toggle_t_list_checkboxes()) \
+                    .props('dense round unelevated aria-label="Alle Checkboxen umschalten"')
+
+            t_list_table = ui.table(
+                columns=[
+                    {'name': 'datum', 'label': 'Datum', 'field': 'datum', 'align': 'left'},
+                    {'name': 'zeit', 'label': 'Zeit', 'field': 'zeit', 'align': 'left'},
+                    {'name': 'bereich', 'label': 'Bereich', 'field': 'bereich', 'align': 'left'},
+                    {'name': 'details', 'label': 'Details', 'field': 'details', 'align': 'left'},
+                ],
+                rows=[],
+                row_key='row_key',
+            ).classes('w-full')
+            t_list_table.add_slot(
+                'body',
+                '''
+                <q-tr :props="props" :style="{ backgroundColor: props.row.row_color }">
+                    <q-td key="datum" :props="props">{{ props.row.datum }}</q-td>
+                    <q-td key="zeit" :props="props">{{ props.row.zeit }}</q-td>
+                    <q-td key="bereich" :props="props">{{ props.row.bereich }}</q-td>
+                    <q-td key="details" :props="props">{{ props.row.details }}</q-td>
+                </q-tr>
+                ''',
+            )
+            t_list_status = ui.label('').classes('text-sm text-slate-600')
+
+            def append_t_list_rows(
+                rows: list[dict[str, str]],
+                entries: list[dict[str, str]],
+                area: str,
+                details_builder: Callable[[dict[str, str]], str],
+            ) -> None:
+                for entry in entries:
+                    rows.append(
+                        {
+                            'row_key': f"{area}-{entry.get('row_key', '')}",
+                            'datum': str(entry.get('datum', '')),
+                            'zeit': str(entry.get('zeit', '')),
+                            'bereich': area,
+                            'details': details_builder(entry),
+                            'row_color': T_LIST_ROW_COLORS[area],
+                        }
+                    )
+
+            def load_t_list() -> None:
+                date_from = str(t_list_date_from_input.value or '')
+                date_to = str(t_list_date_to_input.value or '')
+                if not date_from or not date_to:
+                    t_list_status.set_text('Bitte Datum von und Datum bis auswaehlen.')
+                    t_list_table.rows = []
+                    t_list_table.update()
+                    return
+
+                if date_from > date_to:
+                    t_list_status.set_text('Datum von darf nicht nach Datum bis liegen.')
+                    t_list_table.rows = []
+                    t_list_table.update()
+                    return
+
+                rows: list[dict[str, str]] = []
+                try:
+                    if tumor_checkbox.value:
+                        append_t_list_rows(
+                            rows,
+                            DATABASE.fetch_tumor_entries(date_from, date_to),
+                            'Tumor',
+                            lambda entry: (
+                                f"Farbe: {entry.get('farbe', '')}, "
+                                f"Menge: {entry.get('menge', '')}"
+                            ),
+                        )
+                    if stoma_checkbox.value:
+                        append_t_list_rows(
+                            rows,
+                            DATABASE.fetch_stoma_entries(date_from, date_to),
+                            'Stoma',
+                            lambda entry: (
+                                f"Konsistenz: {entry.get('konsistenz', '')}, "
+                                f"Platte: {entry.get('platte', '')}"
+                            ),
+                        )
+                    if essen_checkbox.value:
+                        append_t_list_rows(
+                            rows,
+                            DATABASE.fetch_essen_entries(date_from, date_to),
+                            'Essen',
+                            lambda entry: (
+                                f"{entry.get('mahlzeit', '')}: "
+                                f"{entry.get('was_gegessen', '')} "
+                                f"({entry.get('wo_gegessen', '')})"
+                            ),
+                        )
+                    if medis_checkbox.value:
+                        append_t_list_rows(
+                            rows,
+                            DATABASE.fetch_medis_entries(date_from, date_to),
+                            'Medis',
+                            lambda entry: str(entry.get('medikament', '')),
+                        )
+                except Exception as exc:
+                    t_list_status.set_text(f'Laden fehlgeschlagen: {exc}')
+                    t_list_table.rows = []
+                    t_list_table.update()
+                    return
+
+                rows.sort(key=lambda row: (row['datum'], time_sort_key(row['zeit']), row['bereich']))
+                t_list_table.rows = rows
+                t_list_table.update()
+                t_list_status.set_text(f'{len(rows)} Eintraege gefunden.')
+
+            def set_t_list_date_range(date_from: date, date_to: date) -> None:
+                t_list_date_from_input.value = date_from.isoformat()
+                t_list_date_to_input.value = date_to.isoformat()
+                load_t_list()
+
+            def shift_t_list_date_range(days: int) -> None:
+                try:
+                    date_from = date.fromisoformat(str(t_list_date_from_input.value or ''))
+                    date_to = date.fromisoformat(str(t_list_date_to_input.value or ''))
+                except ValueError:
+                    t_list_status.set_text('Bitte Datum von und Datum bis auswaehlen.')
+                    return
+                set_t_list_date_range(
+                    date_from + timedelta(days=days),
+                    date_to + timedelta(days=days),
+                )
+
+            def jump_t_list_to_today() -> None:
+                today_date = date.today()
+                set_t_list_date_range(today_date, today_date)
+
+            def toggle_t_list_checkboxes() -> None:
+                new_value = not all(
+                    [
+                        tumor_checkbox.value,
+                        stoma_checkbox.value,
+                        essen_checkbox.value,
+                        medis_checkbox.value,
+                    ]
+                )
+                tumor_checkbox.value = new_value
+                stoma_checkbox.value = new_value
+                essen_checkbox.value = new_value
+                medis_checkbox.value = new_value
+                load_t_list()
+
+            def open_t_list_dialog() -> None:
+                today = date.today().isoformat()
+                t_list_date_from_input.value = today
+                t_list_date_to_input.value = today
+                load_t_list()
+                t_list_dialog.open()
+
+            t_list_date_from_input.on_value_change(load_t_list)
+            t_list_date_to_input.on_value_change(load_t_list)
+            tumor_checkbox.on_value_change(load_t_list)
+            stoma_checkbox.on_value_change(load_t_list)
+            essen_checkbox.on_value_change(load_t_list)
+            medis_checkbox.on_value_change(load_t_list)
+
+            with ui.row().classes('w-full justify-end gap-2'):
+                ui.button('Schliessen', on_click=t_list_dialog.close).props('flat no-caps dense')
+
         menu_fabs = []
         with ui.column().classes('w-full max-w-xl gap-3 sm:gap-4'):
             menu_button_row(
                 'Tumor', '/tumor', '#B84A5A', 'Tumor Ausw.', '/tumor-auswerten', '#7E3A54',
-                menu_fabs,
+                menu_fabs, [{'icon': 'list', 'label': 'T-Liste', 'on_click': open_t_list_dialog}],
             )
             menu_button_row(
                 'Stoma', '/stoma', '#B77945', 'Stoma Ausw.', '/stoma-auswerten', '#6F5A3C',

@@ -38,9 +38,9 @@ def register_stoma_analysis_pages(
 
             with ui.row().classes('w-full max-w-2xl flex-wrap items-end justify-center gap-4'):
                 date_from_input = ui.input('Datum von', value=today).props('type=date') \
-                    .classes('w-32 max-w-full')
+                    .classes('w-28 max-w-full')
                 date_to_input = ui.input('Datum bis', value=today).props('type=date') \
-                    .classes('w-32 max-w-full')
+                    .classes('w-28 max-w-full')
                 source_switch = ui.switch(value=False).props('dense')
                 with ui.button_group().props('unelevated'):
                     ui.button(icon='chevron_left', on_click=lambda: shift_date_range(-1)) \
