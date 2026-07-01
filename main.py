@@ -37,7 +37,7 @@ from src.stumor.page import register_tumor_pages
 
 
 logging.basicConfig(level=logging.INFO)
-APP_VERSION = '0.1.57'
+APP_VERSION = '1.0.1'
 T_LIST_ROW_COLORS = {
     'Tumor': 'rgba(184, 74, 90, 0.10)',
     'Stoma': 'rgba(183, 121, 69, 0.10)',
