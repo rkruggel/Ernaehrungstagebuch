@@ -44,6 +44,19 @@ body {
     line-height: 1.2;
 }
 
+.t-list-time-popup {
+    min-width: 72px;
+    padding: 8px 10px;
+    border: 1px solid #d6dee6;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #1f2937;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    text-align: center;
+    box-shadow: 0 8px 18px rgb(15 23 42 / 0.16);
+}
+
 @media (min-width: 640px) {
     .menu-main-button {
         flex-basis: calc((100% - 88px) / 2 - 10px) !important;

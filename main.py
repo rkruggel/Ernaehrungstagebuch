@@ -37,7 +37,7 @@ from src.stumor.page import register_tumor_pages
 
 
 logging.basicConfig(level=logging.INFO)
-APP_VERSION = '1.0.1'
+APP_VERSION = '1.0.2'
 T_LIST_ROW_COLORS = {
     'Tumor': 'rgba(184, 74, 90, 0.10)',
     'Stoma': 'rgba(183, 121, 69, 0.10)',
@@ -128,6 +128,39 @@ def time_sort_key(value: object) -> tuple[int, int]:
     except ValueError:
         return (99, 99)
     return (parsed_time.hour, parsed_time.minute)
+
+
+def t_list_datetime(row: dict[str, object]) -> datetime | None:
+    time_value = str(row.get('zeit', '')).split('-', 1)[0]
+    try:
+        return datetime.strptime(f"{row.get('datum', '')} {time_value}", '%Y-%m-%d %H:%M')
+    except ValueError:
+        return None
+
+
+def format_t_list_duration(start: datetime, end: datetime) -> str:
+    total_minutes = int(abs(end - start).total_seconds() // 60)
+    hours, minutes = divmod(total_minutes, 60)
+    return f'{hours:02d}:{minutes:02d}'
+
+
+def add_t_list_time_differences(rows: list[dict[str, object]]) -> None:
+    for index, row in enumerate(rows):
+        row['previous_time_diff'] = ''
+        row['next_time_diff'] = ''
+        row['has_time_diffs'] = False
+        if index == 0 or index == len(rows) - 1:
+            continue
+
+        previous_time = t_list_datetime(rows[index - 1])
+        current_time = t_list_datetime(row)
+        next_time = t_list_datetime(rows[index + 1])
+        if previous_time is None or current_time is None or next_time is None:
+            continue
+
+        row['previous_time_diff'] = format_t_list_duration(previous_time, current_time)
+        row['next_time_diff'] = format_t_list_duration(current_time, next_time)
+        row['has_time_diffs'] = True
 
 
 def menu_options_fab(
@@ -235,7 +268,18 @@ def index_page() -> None:
                 '''
                 <q-tr :props="props" :style="{ backgroundColor: props.row.row_color }">
                     <q-td key="datum" :props="props">{{ props.row.datum }}</q-td>
-                    <q-td key="zeit" :props="props">{{ props.row.zeit }}</q-td>
+                    <q-td key="zeit" :props="props">
+                        <span v-if="props.row.has_time_diffs">
+                            <a href="#" @click.prevent>{{ props.row.zeit }}</a>
+                            <q-popup-proxy anchor="center right" self="center left" :offset="[8, 0]">
+                                <div class="t-list-time-popup">
+                                    <div>{{ props.row.previous_time_diff }}</div>
+                                    <div>{{ props.row.next_time_diff }}</div>
+                                </div>
+                            </q-popup-proxy>
+                        </span>
+                        <span v-else>{{ props.row.zeit }}</span>
+                    </q-td>
                     <q-td key="bereich" :props="props">{{ props.row.bereich }}</q-td>
                     <q-td key="details" :props="props">{{ props.row.details }}</q-td>
                 </q-tr>
@@ -244,7 +288,7 @@ def index_page() -> None:
             t_list_status = ui.label('').classes('text-sm text-slate-600')
 
             def append_t_list_rows(
-                rows: list[dict[str, str]],
+                rows: list[dict[str, object]],
                 entries: list[dict[str, str]],
                 area: str,
                 details_builder: Callable[[dict[str, str]], str],
@@ -276,7 +320,7 @@ def index_page() -> None:
                     t_list_table.update()
                     return
 
-                rows: list[dict[str, str]] = []
+                rows: list[dict[str, object]] = []
                 try:
                     if tumor_checkbox.value:
                         append_t_list_rows(
@@ -323,6 +367,7 @@ def index_page() -> None:
                     return
 
                 rows.sort(key=lambda row: (row['datum'], time_sort_key(row['zeit']), row['bereich']))
+                add_t_list_time_differences(rows)
                 t_list_table.rows = rows
                 t_list_table.update()
                 t_list_status.set_text(f'{len(rows)} Eintraege gefunden.')
