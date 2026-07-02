@@ -5,7 +5,7 @@ from datetime import datetime
 
 from nicegui import ui
 
-from src.sessen.page import EditableOptionsSelect
+from src.sessen import EditableOptionsSelect
 
 SaveDocument = Callable[[dict[str, object]], str]
 FetchOptions = Callable[[], list[str]]
